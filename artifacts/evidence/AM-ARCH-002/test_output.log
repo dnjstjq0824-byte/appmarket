@@ -1,0 +1,7 @@
+﻿=== RUN   TestOutboxRelayAndIdempotentJobExecution
+--- PASS: TestOutboxRelayAndIdempotentJobExecution (0.00s)
+=== RUN   TestZombieJobReaperAndDLQRetry
+--- PASS: TestZombieJobReaperAndDLQRetry (0.00s)
+PASS
+coverage: 83.4% of statements
+ok  	github.com/bookingnetwork/appmarket/backend/internal/worker	(cached)	coverage: 83.4% of statements

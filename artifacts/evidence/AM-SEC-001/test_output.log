@@ -1,0 +1,12 @@
+﻿=== RUN   TestRBACPermissionMatrixEnforcement
+--- PASS: TestRBACPermissionMatrixEnforcement (0.03s)
+=== RUN   TestDualControlSelfApprovalForbidden
+--- PASS: TestDualControlSelfApprovalForbidden (0.00s)
+PASS
+coverage: 58.7% of statements
+ok  	github.com/bookingnetwork/appmarket/backend/internal/modules/iam/rbac	1.551s	coverage: 58.7% of statements
+=== RUN   TestAuditHashChainTamperDetection
+--- PASS: TestAuditHashChainTamperDetection (0.00s)
+PASS
+coverage: 93.4% of statements
+ok  	github.com/bookingnetwork/appmarket/backend/internal/platform/audit	(cached)	coverage: 93.4% of statements

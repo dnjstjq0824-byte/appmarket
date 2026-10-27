@@ -1,0 +1,17 @@
+groups:
+  - name: bn-appmarket
+    rules:
+      - alert: ApiHigh5xxRate
+        expr: sum(rate(bn_http_requests_total{status_class="5xx"}[5m])) / clamp_min(sum(rate(bn_http_requests_total[5m])), 0.001) > 0.05
+        for: 5m
+        labels: {severity: warning}
+      - alert: LedgerImbalanceDetected
+        expr: increase(bn_ledger_imbalance_errors_total[1m]) > 0
+        labels: {severity: critical}
+      - alert: AuditChainIntegrityBroken
+        expr: bn_audit_chain_verify_status == 0
+        labels: {severity: critical}
+      - alert: MalwareScanQueueBacklog
+        expr: bn_worker_queue_lag{queue="q:artifact:malware_scan"} > 50
+        for: 5m
+        labels: {severity: warning}

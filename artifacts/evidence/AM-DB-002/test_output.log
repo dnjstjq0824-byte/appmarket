@@ -1,0 +1,11 @@
+﻿=== RUN   TestGenerateMonthlyPartition
+--- PASS: TestGenerateMonthlyPartition (0.00s)
+=== RUN   TestEnsureFuturePartitions
+--- PASS: TestEnsureFuturePartitions (0.00s)
+=== RUN   TestMigrationSchemaFilesIntegrity
+--- PASS: TestMigrationSchemaFilesIntegrity (0.00s)
+=== RUN   TestLedgerZeroBalanceEnforcement
+--- PASS: TestLedgerZeroBalanceEnforcement (0.00s)
+PASS
+coverage: 97.0% of statements
+ok  	github.com/bookingnetwork/appmarket/backend/db	(cached)	coverage: 97.0% of statements

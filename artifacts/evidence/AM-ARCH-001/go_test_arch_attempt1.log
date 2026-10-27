@@ -1,0 +1,14 @@
+﻿COMMAND: go test -v -coverprofile=../artifacts/evidence/AM-ARCH-001/coverage.out ./...
+# ../artifacts/evidence/AM-ARCH-001/coverage.out
+stat C:\Users\dnjst\Desktop\project\appmarket\artifacts\evidence\AM-ARCH-001\coverage.out: directory not found
+FAIL	../artifacts/evidence/AM-ARCH-001/coverage.out [setup failed]
+	github.com/bookingnetwork/appmarket/backend/cmd/api		coverage: 0.0% of statements
+=== RUN   TestDomainImportBoundaries
+--- PASS: TestDomainImportBoundaries (0.00s)
+PASS
+coverage: [no statements]
+ok  	github.com/bookingnetwork/appmarket/backend/internal	1.091s	coverage: [no statements]
+	github.com/bookingnetwork/appmarket/backend/internal/platform/errors		coverage: 0.0% of statements
+	github.com/bookingnetwork/appmarket/backend/internal/platform/httpserver		coverage: 0.0% of statements
+FAIL
+EXIT_CODE: 1

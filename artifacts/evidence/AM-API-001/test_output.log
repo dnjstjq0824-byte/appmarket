@@ -1,0 +1,9 @@
+﻿=== RUN   TestRefreshTokenRotationAndReuseDetection
+--- PASS: TestRefreshTokenRotationAndReuseDetection (0.06s)
+=== RUN   TestAuthLifecycleAndBruteForceLockout
+--- PASS: TestAuthLifecycleAndBruteForceLockout (0.02s)
+=== RUN   TestMFAServiceVerification
+--- PASS: TestMFAServiceVerification (0.00s)
+PASS
+coverage: 77.8% of statements
+ok  	github.com/bookingnetwork/appmarket/backend/internal/modules/iam/application	1.409s	coverage: 77.8% of statements

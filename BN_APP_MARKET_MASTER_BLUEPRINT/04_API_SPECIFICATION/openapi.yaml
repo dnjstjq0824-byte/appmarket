@@ -1,0 +1,1086 @@
+openapi: 3.1.0
+info:
+  title: Booking Network Global Unified App Market Platform API
+  version: 1.0.0
+  summary: Commercial-Grade Unified App Market (Independent Store + Federated Search + Universal Marketplace)
+  description: |
+    Complete OpenAPI 3.1 contract covering all 19 API domains defined in Article 9 of
+    directive BN-APP-MARKET-GEMINI4-ARGON-MASTER-BLUEPRINT-001.
+  contact:
+    name: Booking Network Platform Architecture Team
+  license:
+    name: Proprietary - Booking Network
+servers:
+  - url: https://api.appmarket.bookingnetwork.internal
+    description: Production Standalone App Market API
+  - url: http://localhost:8080
+    description: Local / CI Integration Test Environment
+tags:
+  - name: 01_Authentication
+    description: Registration, Login, OIDC, MFA & Token Rotation
+  - name: 02_User
+    description: User Profile, Preferences, Entitlements & Download History
+  - name: 03_Developer
+    description: Developer Orgs, KYB Verification, Team RBAC & CI API Keys
+  - name: 04_AppCatalog
+    description: Unified App Catalog, Categories, Versions & Multi-Source Comparison
+  - name: 05_Search
+    description: OpenSearch Multilingual Search, Autocomplete & Facets
+  - name: 06_Upload
+    description: Quarantine Multipart Upload Sessions & Artifact Verification
+  - name: 07_Release
+    description: Release Tracks, Review Submission, Staged Rollout & Halt/Rollback
+  - name: 08_Distribution
+    description: Signed CDN Download Tokens & Device Compatibility Resolution
+  - name: 09_InstallUpdateEvent
+    description: Batch Device Update Checks & OS PackageInstaller Telemetry
+  - name: 10_Review
+    description: Verified-Install User Reviews & Developer Replies
+  - name: 11_Moderation
+    description: Abuse/DMCA Reporting & Developer Appeals
+  - name: 12_Admin
+    description: 20-Domain Admin Operations, App Review, Kill-Switch & Dual-Control
+  - name: 13_Payment
+    description: Pricing Quotes, Paid App Orders, PG Webhooks & Refunds
+  - name: 14_Settlement
+    description: Double-Entry Ledger Statements & Monthly Developer Payouts
+  - name: 15_Advertising
+    description: Sponsored App Campaigns, Ad Serving & Click-Fraud Filtered Billing
+  - name: 16_Analytics
+    description: Conversion Funnel Metrics & Telemetry Batch Ingestion
+  - name: 17_Notification
+    description: In-App & Push/Email Notification Center
+  - name: 18_ExternalConnector
+    description: F-Droid & Partner Feed Connector Management & Provenance
+  - name: 19_TreeScanIntegration
+    description: Future TreeScan Search Adapter, Catalog Feed & OIDC Token Exchange (Phase 10)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RS256 signed Access JWT (15-min TTL)
+    DeveloperApiKey:
+      type: apiKey
+      in: header
+      name: X-BN-Dev-Api-Key
+      description: Scoped CI/CD API Key for artifact upload and release submission
+    TreeScanServiceAuth:
+      type: apiKey
+      in: header
+      name: X-TreeScan-Service-Token
+      description: Dedicated mTLS / HMAC token for Phase 10 TreeScan Federation Adapter
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+      description: Client-generated UUIDv4/v7 key enforcing idempotent mutation execution
+    StepUpMfaCode:
+      name: X-MFA-TOTP-Code
+      in: header
+      required: false
+      schema:
+        type: string
+        pattern: '^[0-9]{6}$'
+      description: Required on sensitive admin/developer mutations
+    CursorParam:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  schemas:
+    ProblemDetails:
+      type: object
+      required: [type, title, status, code, detail, trace_id, timestamp]
+      properties:
+        type:
+          type: string
+          format: uri
+          example: https://api.appmarket.bookingnetwork.internal/errors/ERR_APK_SIGNATURE_INVALID
+        title:
+          type: string
+          example: APK cryptographic signature verification failed
+        status:
+          type: integer
+          example: 422
+        code:
+          type: string
+          example: ERR_APK_SIGNATURE_INVALID
+        detail:
+          type: string
+          example: Uploaded APK does not contain a valid APK Signature Scheme v2/v3 block
+        trace_id:
+          type: string
+          example: 4bf92f3577b34da6a3ce929d0e0e4736
+        timestamp:
+          type: string
+          format: date-time
+        field_errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    CatalogAppSummary:
+      type: object
+      required: [id, canonical_slug, primary_package_name, title, icon_url, monetization_type, bayesian_rating, rating_count, sources]
+      properties:
+        id:
+          type: string
+          format: uuid
+        canonical_slug:
+          type: string
+        primary_package_name:
+          type: string
+        title:
+          type: string
+        short_description:
+          type: string
+        developer_display_name:
+          type: string
+        icon_url:
+          type: string
+          format: uri
+        primary_category_id:
+          type: string
+        monetization_type:
+          type: string
+          enum: [FREE, FREE_WITH_ADS, FREE_WITH_IAP, PAID_ONCE, SUBSCRIPTION_READY]
+        global_age_rating:
+          type: string
+          enum: [ALL, AGE_7, AGE_12, AGE_16, AGE_18_ADULT]
+        bayesian_rating:
+          type: number
+        rating_count:
+          type: integer
+        is_sponsored:
+          type: boolean
+          default: false
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/DistributionSourceOption'
+
+    DistributionSourceOption:
+      type: object
+      required: [distribution_id, source_type, distribution_mode, rights_level, package_name, provenance_label, can_direct_install, last_synced_at]
+      properties:
+        distribution_id:
+          type: string
+          format: uuid
+        source_type:
+          type: string
+          enum: [BN_HOSTED, FDROID_REPO, GOOGLE_PLAY_LINK, GALAXY_STORE_LINK, APPLE_APPSTORE_LINK, OFFICIAL_SITE_LINK]
+        distribution_mode:
+          type: string
+          enum: [DIRECT_HOSTED, FEDERATED_REPO_BINARY, SEARCH_INFO_ONLY, EXTERNAL_LINK_ONLY]
+        rights_level:
+          type: string
+          enum: [LEVEL_1_DIRECT_HOSTED, LEVEL_2_LICENSED_FEDERATED_BINARY, LEVEL_3_SEARCH_AND_INFO_ONLY, LEVEL_4_OFFICIAL_LINK_ONLY, LEVEL_5_RESTRICTED_PROHIBITED]
+        package_name:
+          type: string
+        signing_cert_sha256:
+          type: [string, 'null']
+        latest_version_code:
+          type: integer
+        latest_version_name:
+          type: string
+        min_sdk:
+          type: integer
+        file_size_bytes:
+          type: integer
+        price_minor:
+          type: integer
+        currency:
+          type: string
+        official_store_url:
+          type: [string, 'null']
+        provenance_label:
+          type: string
+        can_direct_install:
+          type: boolean
+        last_synced_at:
+          type: string
+          format: date-time
+
+    UploadSessionRequest:
+      type: object
+      required: [artifact_type, file_name, expected_size_bytes, expected_sha256]
+      properties:
+        artifact_type:
+          type: string
+          enum: [APK, AAB]
+        file_name:
+          type: string
+        expected_size_bytes:
+          type: integer
+          minimum: 1024
+          maximum: 4294967296
+        expected_sha256:
+          type: string
+          pattern: '^[a-fA-F0-9]{64}$'
+
+    DownloadTokenResponse:
+      type: object
+      required: [download_url, expires_at, sha256_checksum, signing_cert_sha256, version_code, file_size_bytes]
+      properties:
+        download_url:
+          type: string
+          format: uri
+        expires_at:
+          type: string
+          format: date-time
+        sha256_checksum:
+          type: string
+        signing_cert_sha256:
+          type: string
+        version_code:
+          type: integer
+        file_size_bytes:
+          type: integer
+
+    DeviceUpdateCheckRequest:
+      type: object
+      required: [device_sdk, supported_abis, density_dpi, installed_packages]
+      properties:
+        device_sdk:
+          type: integer
+          minimum: 21
+        supported_abis:
+          type: array
+          items:
+            type: string
+        density_dpi:
+          type: integer
+        available_features:
+          type: array
+          items:
+            type: string
+        installed_packages:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            required: [package_name, version_code, signing_cert_sha256]
+            properties:
+              package_name:
+                type: string
+              version_code:
+                type: integer
+              signing_cert_sha256:
+                type: string
+              installer_package:
+                type: [string, 'null']
+
+paths:
+  # 1. Authentication API
+  /api/v1/auth/register:
+    post:
+      tags: [01_Authentication]
+      summary: Register a new user account
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, display_name, country_code]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 12 }
+                display_name: { type: string, minLength: 2, maxLength: 100 }
+                country_code: { type: string, minLength: 2, maxLength: 2 }
+      responses:
+        '201':
+          description: Account created pending email verification
+        '409':
+          description: Email already registered
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /api/v1/auth/login:
+    post:
+      tags: [01_Authentication]
+      summary: Authenticate user and issue JWT / MFA challenge
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+                totp_code: { type: string }
+      responses:
+        '200':
+          description: Authenticated tokens issued
+        '401':
+          description: Invalid credentials or MFA required
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  /api/v1/auth/token/refresh:
+    post:
+      tags: [01_Authentication]
+      summary: Rotate Refresh Token and issue new Access JWT (with reuse detection)
+      operationId: refreshAuthToken
+      responses:
+        '200':
+          description: Rotated token pair
+        '401':
+          description: Invalid or reused refresh token (family revoked)
+
+  /api/v1/auth/token/exchange:
+    post:
+      tags: [01_Authentication, 19_TreeScanIntegration]
+      summary: RFC 8693 OAuth 2.0 Token Exchange for future TreeScan SSO federation
+      operationId: exchangeTreeScanToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject_token, subject_token_type]
+              properties:
+                subject_token: { type: string }
+                subject_token_type: { type: string, enum: ['urn:ietf:params:oauth:token-type:id_token'] }
+      responses:
+        '200':
+          description: Exchanged App Market session token
+        '503':
+          description: TreeScan integration currently disabled (STANDALONE_ISOLATED mode)
+
+  # 2. User API
+  /api/v1/users/me:
+    get:
+      tags: [02_User]
+      summary: Retrieve current user profile, MFA status, and preferences
+      operationId: getCurrentUser
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Current user profile
+    patch:
+      tags: [02_User]
+      summary: Update locale, currency, dark mode, or privacy preferences
+      operationId: updateCurrentUser
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Profile updated
+
+  /api/v1/users/me/entitlements:
+    get:
+      tags: [02_User, 13_Payment]
+      summary: List user purchased apps and active download entitlements
+      operationId: listUserEntitlements
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Paginated entitlements list
+
+  # 3. Developer API
+  /api/v1/developer/orgs:
+    post:
+      tags: [03_Developer]
+      summary: Create a new Developer Organization
+      operationId: createDeveloperOrg
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [org_slug, legal_name, display_name, org_type, country_code, support_email]
+              properties:
+                org_slug: { type: string }
+                legal_name: { type: string }
+                display_name: { type: string }
+                org_type: { type: string, enum: [INDIVIDUAL, CORPORATION, OPEN_SOURCE_COLLECTIVE] }
+                country_code: { type: string }
+                support_email: { type: string, format: email }
+      responses:
+        '201':
+          description: Developer organization created
+
+  /api/v1/developer/orgs/{orgId}/verification:
+    post:
+      tags: [03_Developer]
+      summary: Submit KYB identity verification documents and domain token check
+      operationId: submitDeveloperKyb
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '202':
+          description: KYB verification submitted for admin review
+
+  /api/v1/developer/orgs/{orgId}/apps:
+    post:
+      tags: [03_Developer, 04_AppCatalog]
+      summary: Register a new app under the developer organization
+      operationId: createDeveloperApp
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Draft catalog app created
+
+  # 4. App Catalog API
+  /api/v1/catalog/apps:
+    get:
+      tags: [04_AppCatalog]
+      summary: List and filter catalog apps across categories, sources, and ratings
+      operationId: listCatalogApps
+      parameters:
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: source_type
+          in: query
+          schema: { type: string, enum: [BN_HOSTED, FDROID_REPO, GOOGLE_PLAY_LINK, GALAXY_STORE_LINK] }
+        - name: direct_only
+          in: query
+          schema: { type: boolean }
+        - name: price_type
+          in: query
+          schema: { type: string, enum: [ALL, FREE, PAID] }
+        - name: sort
+          in: query
+          schema: { type: string, enum: [POPULAR, RATING, NEWEST, UPDATED] }
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Paginated catalog apps
+
+  /api/v1/catalog/apps/{slug}:
+    get:
+      tags: [04_AppCatalog]
+      summary: Get full app details, localized media, permissions, signature info, and multi-source comparison
+      operationId: getCatalogAppDetail
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Composite app detail with all distribution sources
+        '404':
+          description: App not found
+        '451':
+          description: Blocked in requester country due to legal regulation
+
+  /api/v1/catalog/charts/{chartType}:
+    get:
+      tags: [04_AppCatalog]
+      summary: Get top charts (TOP_FREE, TOP_PAID, TRENDING_RISING, NEW_NOTEWORTHY)
+      operationId: getCatalogCharts
+      parameters:
+        - name: chartType
+          in: path
+          required: true
+          schema: { type: string, enum: [TOP_FREE, TOP_PAID, TRENDING_RISING, NEW_NOTEWORTHY] }
+        - name: category
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Ranked chart items
+
+  # 5. Search API
+  /api/v1/search/apps:
+    get:
+      tags: [05_Search]
+      summary: Unified multilingual search across hosted and federated external app stores
+      operationId: searchApps
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 100 }
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: direct_install_only
+          in: query
+          schema: { type: boolean }
+        - name: min_rating
+          in: query
+          schema: { type: number, minimum: 0, maximum: 5 }
+        - name: compatible_sdk
+          in: query
+          schema: { type: integer }
+        - name: compatible_abi
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results with provenance badges and facets
+
+  /api/v1/search/suggest:
+    get:
+      tags: [05_Search]
+      summary: Sub-50ms autocomplete query suggestions and instant app hits
+      operationId: suggestSearch
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 60 }
+      responses:
+        '200':
+          description: Query suggestions and top 3 direct app matches
+
+  # 6. Upload API
+  /api/v1/developer/apps/{appId}/uploads:
+    post:
+      tags: [06_Upload]
+      summary: Initiate an isolated quarantine upload session for an APK or AAB
+      operationId: createUploadSession
+      security: [{ BearerAuth: [] }, { DeveloperApiKey: [] }]
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadSessionRequest'
+      responses:
+        '201':
+          description: Quarantine multipart upload session created
+
+  /api/v1/developer/apps/{appId}/uploads/{sessionId}/complete:
+    post:
+      tags: [06_Upload]
+      summary: Complete upload and enqueue isolated integrity, signature, and malware verification jobs
+      operationId: completeUploadSession
+      security: [{ BearerAuth: [] }, { DeveloperApiKey: [] }]
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '202':
+          description: Artifact queued for verification and malware scanning
+
+  # 7. Release API
+  /api/v1/developer/apps/{appId}/releases:
+    post:
+      tags: [07_Release]
+      summary: Create a release on INTERNAL, BETA, or PRODUCTION track and attach verified artifacts
+      operationId: createAppRelease
+      security: [{ BearerAuth: [] }, { DeveloperApiKey: [] }]
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Release created
+
+  /api/v1/developer/apps/{appId}/releases/{releaseId}/submit:
+    post:
+      tags: [07_Release]
+      summary: Submit verified release for review (requires verified KYB org and MFA)
+      operationId: submitReleaseForReview
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: releaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/StepUpMfaCode'
+      responses:
+        '200':
+          description: Release transitioned to SUBMITTED_FOR_REVIEW
+
+  /api/v1/developer/apps/{appId}/releases/{releaseId}/rollout:
+    patch:
+      tags: [07_Release]
+      summary: Adjust staged rollout percentage (1-100%) or halt/resume active release
+      operationId: updateReleaseRollout
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: releaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Rollout percentage or halt status updated
+
+  # 8. Distribution API
+  /api/v1/catalog/apps/{appId}/releases/{releaseId}/download-token:
+    post:
+      tags: [08_Distribution]
+      summary: Verify geo-policy, entitlement, and device compatibility, then issue a short-lived signed CDN URL
+      operationId: issueDownloadToken
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: releaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Signed immutable CDN download URL and cryptographic digests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadTokenResponse'
+        '403':
+          description: Paid entitlement required or direct download not permitted for external source
+        '451':
+          description: Blocked in country
+
+  # 9. Install/Update Event API
+  /api/v1/device/check-updates:
+    post:
+      tags: [09_InstallUpdateEvent]
+      summary: Batch evaluate installed packages for compatible updates and signature continuity
+      operationId: checkDeviceUpdates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceUpdateCheckRequest'
+      responses:
+        '200':
+          description: Per-package update availability and signature compatibility verdict
+
+  /api/v1/events/install:
+    post:
+      tags: [09_InstallUpdateEvent, 16_Analytics]
+      summary: Report download completion and Android PackageInstaller session outcome
+      operationId: reportInstallEvent
+      responses:
+        '202':
+          description: Telemetry recorded
+
+  # 10. Review API
+  /api/v1/catalog/apps/{slug}/reviews:
+    get:
+      tags: [10_Review]
+      summary: List verified user reviews and developer replies for an app
+      operationId: listAppReviews
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/CursorParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Reviews list and rating distribution
+    post:
+      tags: [10_Review]
+      summary: Submit a review (strictly requires verified installation record)
+      operationId: createAppReview
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '201':
+          description: Review published
+        '403':
+          description: ERR_REVIEW_REQUIRES_INSTALLATION
+
+  /api/v1/developer/apps/{appId}/reviews/{reviewId}/reply:
+    put:
+      tags: [10_Review, 03_Developer]
+      summary: Post or update an official developer reply to a user review
+      operationId: replyToReview
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: reviewId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Reply saved
+
+  # 11. Moderation API
+  /api/v1/moderation/reports:
+    post:
+      tags: [11_Moderation]
+      summary: Submit an abuse, malware, impersonation, or DMCA copyright report
+      operationId: createModerationReport
+      responses:
+        '201':
+          description: Report logged into SLA queue
+
+  /api/v1/developer/orgs/{orgId}/appeals:
+    post:
+      tags: [11_Moderation, 03_Developer]
+      summary: Submit a formal developer appeal against a rejection or suspension (routed to a different senior reviewer)
+      operationId: submitDeveloperAppeal
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '201':
+          description: Appeal queued for senior reviewer
+
+  # 12. Admin API
+  /api/v1/admin/reviews/{releaseId}/decision:
+    post:
+      tags: [12_Admin]
+      summary: Approve, request changes, or reject a submitted app release
+      operationId: decideReleaseReview
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: releaseId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/StepUpMfaCode'
+      responses:
+        '200':
+          description: Review decision recorded and audit logged
+
+  /api/v1/admin/security/kill-switch/{appId}:
+    post:
+      tags: [12_Admin]
+      summary: Emergency revoke an app/release, purge CDN, and push security uninstall alert to devices
+      operationId: executeEmergencyKillSwitch
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/StepUpMfaCode'
+      responses:
+        '200':
+          description: Emergency takedown executed
+
+  /api/v1/admin/approvals/{requestId}/approve:
+    post:
+      tags: [12_Admin]
+      summary: Second-approver sign-off for Dual-Control sensitive operations (Four-Eyes Principle)
+      operationId: approveDualControlRequest
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/StepUpMfaCode'
+      responses:
+        '200':
+          description: Dual-control request approved and executed
+        '403':
+          description: ERR_DUAL_CONTROL_SELF_APPROVAL_FORBIDDEN
+
+  # 13. Payment API
+  /api/v1/commerce/quotes:
+    post:
+      tags: [13_Payment]
+      summary: Calculate deterministic order quote including regional tax and promo code
+      operationId: createOrderQuote
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Calculated order quote
+
+  /api/v1/commerce/orders:
+    post:
+      tags: [13_Payment]
+      summary: Create a paid app order and initialize PG checkout session
+      operationId: createOrder
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Order created
+
+  /api/v1/commerce/webhooks/{provider}:
+    post:
+      tags: [13_Payment]
+      summary: Receive HMAC-verified PG webhook, post double-entry ledger, and grant/revoke entitlement
+      operationId: handlePaymentWebhook
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string, enum: [stripe, toss, portone] }
+      responses:
+        '200':
+          description: Webhook processed idempotently
+
+  /api/v1/commerce/orders/{orderId}/refund:
+    post:
+      tags: [13_Payment]
+      summary: Request a refund for an order
+      operationId: requestOrderRefund
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Refund processed or queued for review
+
+  # 14. Settlement API
+  /api/v1/developer/orgs/{orgId}/settlements:
+    get:
+      tags: [14_Settlement]
+      summary: List monthly settlement statements and double-entry ledger breakdown for a developer org
+      operationId: listOrgSettlements
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Monthly settlement statements
+
+  /api/v1/admin/settlements/{settlementId}/approve-payout:
+    post:
+      tags: [14_Settlement, 12_Admin]
+      summary: Initiate or approve monthly developer settlement payout (requires Dual-Control)
+      operationId: approveSettlementPayout
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: settlementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/StepUpMfaCode'
+      responses:
+        '200':
+          description: Payout approval recorded
+
+  # 15. Advertising API
+  /api/v1/developer/orgs/{orgId}/ads/campaigns:
+    post:
+      tags: [15_Advertising]
+      summary: Create a sponsored app ad campaign with CPC bid and daily budget cap
+      operationId: createAdCampaign
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Ad campaign created pending review
+
+  /api/v1/ads/serve:
+    get:
+      tags: [15_Advertising]
+      summary: Select sponsored app cards for a placement slot and issue signed impression tokens
+      operationId: serveSponsoredAds
+      parameters:
+        - name: slot
+          in: query
+          required: true
+          schema: { type: string, enum: [SEARCH_TOP, CATEGORY_FEATURED, HOME_SPOTLIGHT] }
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Sponsored app cards with impression tokens
+
+  /api/v1/ads/click:
+    post:
+      tags: [15_Advertising]
+      summary: Record ad click, filter click-fraud/duplicates, and deduct CPC budget
+      operationId: recordAdClick
+      responses:
+        '200':
+          description: Click processed
+
+  # 16. Analytics API
+  /api/v1/developer/apps/{appId}/analytics:
+    get:
+      tags: [16_Analytics]
+      summary: Retrieve conversion funnel (impressions -> views -> downloads -> installs -> revenue)
+      operationId: getAppAnalyticsFunnel
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: from_date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+        - name: to_date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Time-series funnel metrics
+
+  # 17. Notification API
+  /api/v1/users/me/notifications:
+    get:
+      tags: [17_Notification]
+      summary: List user or developer in-app notifications
+      operationId: listNotifications
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Notifications list
+
+  # 18. External Store Connector API
+  /api/v1/admin/connectors:
+    get:
+      tags: [18_ExternalConnector, 12_Admin]
+      summary: List configured external store connectors (F-Droid, Partner Feeds) and sync health
+      operationId: listExternalConnectors
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Connector list and sync status
+
+  /api/v1/admin/connectors/{connectorId}/trigger-sync:
+    post:
+      tags: [18_ExternalConnector, 12_Admin]
+      summary: Trigger immediate delta synchronization and cryptographic index verification
+      operationId: triggerConnectorSync
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: connectorId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '202':
+          description: Sync job enqueued
+
+  # 19. TreeScan Integration API (Phase 10 Adapter)
+  /api/v1/treescan/federated-search:
+    get:
+      tags: [19_TreeScanIntegration]
+      summary: Low-latency (<80ms) federated app search endpoint for future TreeScan search integration
+      operationId: treeScanFederatedSearch
+      security: [{ TreeScanServiceAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+        - name: locale
+          in: query
+          schema: { type: string, default: ko-KR }
+        - name: country
+          in: query
+          schema: { type: string, default: KR }
+      responses:
+        '200':
+          description: Rich app cards with provenance and canonical links for TreeScan SERP
+        '503':
+          description: Adapter disabled in standalone mode
+
+  /api/v1/treescan/catalog-feed:
+    get:
+      tags: [19_TreeScanIntegration]
+      summary: Cursor-paginated incremental catalog change stream for future TreeScan indexer
+      operationId: treeScanCatalogFeed
+      security: [{ TreeScanServiceAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CursorParam'
+        - name: updated_after
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: Incremental catalog delta batch

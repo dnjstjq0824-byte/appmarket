@@ -1,0 +1,57 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Verify extracted blueprint",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-File",
+				"scripts/verify-blueprint.ps1"
+			]
+		},
+		{
+			"label": "Verify backend",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-File",
+				"scripts/verify-backend.ps1"
+			]
+		},
+		{
+			"label": "Build backend",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"build",
+				"./backend/..."
+			]
+		},
+		{
+			"label": "Format Wave 0 Go files",
+			"type": "shell",
+			"command": "gofmt",
+			"args": [
+				"-w",
+				"backend/cmd/api/main.go",
+				"backend/internal/platform/httpserver/server.go",
+				"backend/internal/platform/httpserver/server_test.go"
+			]
+		},
+		{
+			"label": "Verify blueprint archive and extraction",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-File",
+				"scripts/verify-blueprint.ps1",
+				"-ArchivePath",
+				"C:\\Users\\dnjst\\Downloads\\BN_APP_MARKET_MASTER_BLUEPRINT_V1_0.zip"
+			]
+		}
+	]
+}

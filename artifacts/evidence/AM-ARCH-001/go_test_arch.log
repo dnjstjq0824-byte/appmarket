@@ -1,0 +1,14 @@
+﻿COMMAND: go test -v -coverprofile=../artifacts/evidence/AM-ARCH-001/coverage.out ./...
+	github.com/bookingnetwork/appmarket/backend/cmd/api		coverage: 0.0% of statements
+=== RUN   TestDomainImportBoundaries
+--- PASS: TestDomainImportBoundaries (0.00s)
+PASS
+coverage: [no statements]
+ok  	github.com/bookingnetwork/appmarket/backend/internal	(cached)	coverage: [no statements]
+	github.com/bookingnetwork/appmarket/backend/internal/platform/errors		coverage: 0.0% of statements
+=== RUN   TestReadinessFailsClosedWhileLivenessRemainsAvailable
+--- PASS: TestReadinessFailsClosedWhileLivenessRemainsAvailable (0.08s)
+PASS
+coverage: 58.2% of statements
+ok  	github.com/bookingnetwork/appmarket/backend/internal/platform/httpserver	2.314s	coverage: 58.2% of statements
+EXIT_CODE: 0
