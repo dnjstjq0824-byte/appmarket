@@ -154,3 +154,4 @@ func TestLedgerZeroBalanceEnforcement(t *testing.T) {
 		t.Fatalf("expected ERR_LEDGER_UNBALANCED error message, got %v", err)
 	}
 }
+

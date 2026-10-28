@@ -72,3 +72,4 @@ func TestAuditHashChainTamperDetection(t *testing.T) {
 		t.Fatalf("unexpected error message: %v", errB)
 	}
 }
+

@@ -127,3 +127,4 @@ func TestDualControlSelfApprovalForbidden(t *testing.T) {
 		t.Fatalf("expected ErrDualApprovalAlreadyClosed, got %v", err)
 	}
 }
+

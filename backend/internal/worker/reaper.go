@@ -62,3 +62,4 @@ func (r *ZombieReaper) ReapZombies(ctx context.Context, now time.Time) (int, []s
 func (r *ZombieReaper) RetryDeadLetterJob(ctx context.Context, jobID string) error {
 	return r.repo.ResetDeadLetterJob(ctx, jobID)
 }
+

@@ -157,3 +157,4 @@ func (e *DualControlEngine) Reject(ctx context.Context, requestID, approverID, r
 
 	return req, nil
 }
+

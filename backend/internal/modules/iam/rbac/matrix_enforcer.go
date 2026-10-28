@@ -166,3 +166,4 @@ func GetClaims(ctx context.Context) (*application.AccessClaims, bool) {
 	claims, ok := ctx.Value(ClaimsContextKey).(*application.AccessClaims)
 	return claims, ok
 }
+

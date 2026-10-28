@@ -47,3 +47,4 @@ func TestEnsureFuturePartitions(t *testing.T) {
 		t.Fatalf("expected 6 executed SQL statements, got %d", len(executedSQL))
 	}
 }
+

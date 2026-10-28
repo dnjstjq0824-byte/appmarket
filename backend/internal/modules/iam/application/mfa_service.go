@@ -137,3 +137,4 @@ func (s *MFAService) ValidateMFA(cred *domain.MFACredential, code string, now ti
 
 	return false, domain.ErrInvalidMFACode
 }
+

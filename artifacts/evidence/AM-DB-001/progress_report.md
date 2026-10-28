@@ -19,3 +19,4 @@
 
 ## 3. 미완료 또는 차단 사항
 - Docker 컨테이너 부재로 인해 로컬 live PostgreSQL 인스턴스에 대한 실제 네트워크 마이그레이션 실행은 단위/스키마 파싱 검증으로 수행됨. 독립 감사 전이므로 `IMPLEMENTED_UNVERIFIED`로 보고함.
+

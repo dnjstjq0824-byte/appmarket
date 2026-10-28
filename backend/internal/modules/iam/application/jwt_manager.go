@@ -142,3 +142,4 @@ func (m *JWTManager) GetOpenIDConfiguration(baseURL string) map[string]any {
 		"claims_supported":                      []string{"sub", "iss", "aud", "exp", "iat", "email", "roles"},
 	}
 }
+

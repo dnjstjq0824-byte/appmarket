@@ -170,3 +170,4 @@ func VerifyAuditChain(records []AuditLogRecord) (bool, int, error) {
 
 	return true, -1, nil
 }
+

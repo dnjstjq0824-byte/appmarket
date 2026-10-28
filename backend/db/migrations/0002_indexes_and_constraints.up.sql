@@ -53,3 +53,4 @@ DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION verify_ledger_transaction_balance();
 
 COMMIT;
+

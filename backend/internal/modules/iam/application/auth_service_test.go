@@ -358,3 +358,4 @@ func TestMFAServiceVerification(t *testing.T) {
 		t.Fatalf("reusing already consumed recovery code must fail")
 	}
 }
+

@@ -120,3 +120,4 @@ func ComputeBlindIndex(value, secretKey string) string {
 	mac.Write([]byte(strings.ToLower(strings.TrimSpace(value))))
 	return fmt.Sprintf("%x", mac.Sum(nil))
 }
+

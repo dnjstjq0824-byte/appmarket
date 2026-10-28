@@ -276,3 +276,4 @@ func (d *Dispatcher) ExecuteNext(ctx context.Context, queueName string) (bool, e
 	_ = d.repo.CompleteJob(ctx, job.ID, completedTime)
 	return true, nil
 }
+

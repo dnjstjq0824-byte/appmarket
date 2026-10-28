@@ -21,3 +21,4 @@
 
 ## 3. 미완료 또는 차단 사항
 - 독립 감사 전이므로 `IMPLEMENTED_UNVERIFIED`로 보고함.
+

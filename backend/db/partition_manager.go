@@ -77,3 +77,4 @@ func EnsureFuturePartitions(ctx context.Context, exec func(ctx context.Context, 
 	}
 	return created, nil
 }
+

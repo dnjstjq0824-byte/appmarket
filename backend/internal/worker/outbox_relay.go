@@ -192,3 +192,4 @@ func CreateOutboxEvent(aggregateType, aggregateID, eventType, payloadJSON string
 		CreatedAt:     time.Now().UTC(),
 	}
 }
+

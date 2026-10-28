@@ -378,3 +378,4 @@ func generateRandomToken(bytesLen int) (string, error) {
 	}
 	return hex.EncodeToString(b), nil
 }
+
