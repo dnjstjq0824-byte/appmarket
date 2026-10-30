@@ -1,4 +1,4 @@
-import { existsSync, cpSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, cpSync, rmSync, mkdirSync, writeFileSync, copyFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 
 const rootDir = process.cwd();
@@ -7,7 +7,7 @@ const webUserPublic = resolve(rootDir, 'apps/web-user/.output/public');
 const webAdminDist = resolve(rootDir, 'apps/web-admin/dist');
 const webDevDist = resolve(rootDir, 'apps/web-dev/dist');
 
-console.log('[cloudflare-dist] Preparing unified deployment bundle for Cloudflare Pages...');
+console.log('[cloudflare-dist] Preparing unified deployment bundle for Cloudflare Pages / Workers...');
 
 // 1. Clean and recreate dist
 if (existsSync(distDir)) {
@@ -38,12 +38,21 @@ if (existsSync(webUserPublic)) {
   writeFileSync(join(distDir, 'index.html'), minimalHtml, 'utf-8');
 }
 
+// Ensure root 200.html exists for Cloudflare native SPA fallback
+if (existsSync(join(distDir, 'index.html')) && !existsSync(join(distDir, '200.html'))) {
+  copyFileSync(join(distDir, 'index.html'), join(distDir, '200.html'));
+}
+
 // 3. Copy web-admin to dist/admin
 if (existsSync(webAdminDist)) {
   const adminTarget = join(distDir, 'admin');
   mkdirSync(adminTarget, { recursive: true });
   console.log(`[cloudflare-dist] Copying web-admin (dist) -> dist/admin/`);
   cpSync(webAdminDist, adminTarget, { recursive: true });
+  // Add 200.html for admin SPA fallback
+  if (existsSync(join(adminTarget, 'index.html'))) {
+    copyFileSync(join(adminTarget, 'index.html'), join(adminTarget, '200.html'));
+  }
 } else {
   console.warn(`[cloudflare-dist] Warning: ${webAdminDist} not found`);
 }
@@ -54,12 +63,16 @@ if (existsSync(webDevDist)) {
   mkdirSync(devTarget, { recursive: true });
   console.log(`[cloudflare-dist] Copying web-dev (dist) -> dist/developer/`);
   cpSync(webDevDist, devTarget, { recursive: true });
+  // Add 200.html for developer SPA fallback
+  if (existsSync(join(devTarget, 'index.html'))) {
+    copyFileSync(join(devTarget, 'index.html'), join(devTarget, '200.html'));
+  }
 } else {
   console.warn(`[cloudflare-dist] Warning: ${webDevDist} not found`);
 }
 
-// 5. Generate Cloudflare Pages configuration files
-console.log('[cloudflare-dist] Generating Cloudflare Pages routing and headers...');
+// 5. Generate Cloudflare Pages / Workers configuration files
+console.log('[cloudflare-dist] Generating Cloudflare edge routing and headers...');
 
 const routesJson = {
   version: 1,
@@ -99,17 +112,8 @@ const headersContent = `/*
 `;
 writeFileSync(join(distDir, '_headers'), headersContent, 'utf-8');
 
-const redirectsContent = `# SPA routing fallbacks for Admin and Developer portals
-/admin/*       /admin/index.html       200
-/developer/*   /developer/index.html   200
+// Note: Do NOT generate catch-all wildcard rules in _redirects (e.g. /* /index.html 200).
+// Cloudflare's edge validator rejects them with code 100324 (infinite loop detection).
+// Native SPA fallback is handled via not_found_handling = "single-page-application" and 200.html.
 
-# Nuxt 3 web-user fallback
-/apps/*        /200.html               200
-/search/*      /200.html               200
-/account/*     /200.html               200
-/support/*     /200.html               200
-`;
-writeFileSync(join(distDir, '_redirects'), redirectsContent, 'utf-8');
-
-console.log('[cloudflare-dist] Unified Cloudflare Pages distribution bundle ready in ./dist');
-
+console.log('[cloudflare-dist] Unified Cloudflare distribution bundle ready in ./dist');
