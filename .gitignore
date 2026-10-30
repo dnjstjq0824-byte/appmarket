@@ -10,3 +10,5 @@ dist/
 backend/coverage.out
 backend/bin/
 
+.gradle/
+**/build/
