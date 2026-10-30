@@ -88,3 +88,4 @@ type LedgerTransaction struct {
 	Entries        []LedgerEntry `json:"entries"`
 	CreatedAt      time.Time     `json:"created_at"`
 }
+

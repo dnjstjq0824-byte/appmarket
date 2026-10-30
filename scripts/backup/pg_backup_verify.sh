@@ -20,3 +20,4 @@ SHA256_HASH=$(sha256sum "${BACKUP_FILE}" | awk '{print $1}')
 echo "[+] Backup generated successfully. SHA-256: ${SHA256_HASH}"
 echo "[+] Size: $(stat -c%s "${BACKUP_FILE}") bytes"
 echo "[+] PostgreSQL backup verification PASSED."
+

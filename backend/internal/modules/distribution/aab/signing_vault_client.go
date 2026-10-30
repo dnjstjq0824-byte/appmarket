@@ -112,3 +112,4 @@ func (v *InMemorySigningVault) CreateAppSigningKey(ctx context.Context, appID st
 func (v *InMemorySigningVault) RotateAppSigningKey(ctx context.Context, appID string) (*AppSigningKey, error) {
 	return v.CreateAppSigningKey(ctx, appID)
 }
+

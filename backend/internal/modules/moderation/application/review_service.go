@@ -113,3 +113,4 @@ func (s *ReviewService) GetAppReviews(appID string) []*domain.UserReview {
 	defer s.mu.RUnlock()
 	return s.appReviews[appID]
 }
+

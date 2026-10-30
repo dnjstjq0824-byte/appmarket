@@ -137,3 +137,4 @@ func (b *SearchQueryBuilder) ComputeDeterministicScore(doc domain.SearchDoc, key
 
 	return matchScore * ratingMultiplier * directMultiplier * freshnessMultiplier
 }
+

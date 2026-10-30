@@ -95,3 +95,4 @@ func (e *EnvelopeEncryptor) ComputeBlindIndex(plaintext string) string {
 	mac.Write([]byte(plaintext))
 	return hex.EncodeToString(mac.Sum(nil))
 }
+

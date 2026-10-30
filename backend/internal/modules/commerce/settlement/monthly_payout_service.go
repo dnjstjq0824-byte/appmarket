@@ -103,3 +103,4 @@ func (s *MonthlyPayoutService) ApprovePayout(ctx context.Context, payoutID strin
 
 	return payout, nil
 }
+

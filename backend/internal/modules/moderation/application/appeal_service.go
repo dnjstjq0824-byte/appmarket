@@ -62,3 +62,4 @@ func (s *AppealService) DecideAppeal(ctx context.Context, appealID, reviewerID s
 
 	return appeal, nil
 }
+

@@ -84,3 +84,4 @@ func (g *RightsGuard) FormatProvenance(label string, officialURL string, lastSyn
 		ActionText:       actionText,
 	}, nil
 }
+

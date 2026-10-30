@@ -69,3 +69,4 @@ Write-Host "==========================================================" -Foregro
 Write-Host "  DISASTER RECOVERY (DR) DRILL: 100% SUCCESS              " -ForegroundColor Green
 Write-Host "  Total Drill Execution Time: $($totalDuration.TotalSeconds)s              " -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Cyan
+

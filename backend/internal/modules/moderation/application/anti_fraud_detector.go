@@ -77,3 +77,4 @@ func (d *AntiFraudDetector) EvaluateReview(params FraudEvaluationParams) (float6
 
 	return fraudScore, domain.ReviewPublished
 }
+

@@ -162,3 +162,4 @@ func (s *OrderService) verifySignature(payload []byte, signatureHex string) bool
 	expected := hex.EncodeToString(mac.Sum(nil))
 	return hmac.Equal([]byte(expected), []byte(signatureHex))
 }
+

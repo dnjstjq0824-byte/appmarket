@@ -52,3 +52,4 @@ func (s *PartnerSyncer) IngestPartnerApp(storeName, officialStoreURL, packageNam
 
 	return meta, nil
 }
+

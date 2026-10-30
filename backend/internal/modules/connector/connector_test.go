@@ -149,3 +149,4 @@ func TestTCSEC003ExternalIndexSignatureTamperRejection(t *testing.T) {
 		}
 	})
 }
+

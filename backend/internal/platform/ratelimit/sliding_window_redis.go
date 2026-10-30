@@ -72,3 +72,4 @@ func (l *SlidingWindowLimiter) Allow(ctx context.Context, key string) RateLimitR
 		ResetIn:   l.window,
 	}
 }
+

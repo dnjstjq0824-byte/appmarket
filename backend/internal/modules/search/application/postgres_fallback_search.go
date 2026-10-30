@@ -151,3 +151,4 @@ func (e *InMemoryFallbackSearchEngine) Suggest(ctx context.Context, prefix strin
 		TookMs:      time.Since(start).Milliseconds(),
 	}, nil
 }
+

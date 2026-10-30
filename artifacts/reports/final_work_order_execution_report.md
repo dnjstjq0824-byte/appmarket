@@ -66,3 +66,4 @@
 - **Rounding Leakage**: 0 single won/cent variance. `Gross == DevPayout + Commission + Tax` invariant verified.
 - **Dual Control**: Self-approval strictly forbidden across administration, bank disbursements, and moderation appeals.
 - **TreeScan Independence**: App Market operates 100% standalone without external TreeScan dependency.
+

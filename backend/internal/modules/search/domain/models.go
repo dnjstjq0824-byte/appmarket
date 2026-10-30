@@ -53,3 +53,4 @@ type SuggestResult struct {
 	Suggestions []SuggestionItem `json:"suggestions"`
 	TookMs      int64            `json:"took_ms"`
 }
+

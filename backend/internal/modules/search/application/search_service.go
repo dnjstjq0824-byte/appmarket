@@ -158,3 +158,4 @@ func (s *SearchService) Suggest(ctx context.Context, prefix, locale string, limi
 
 	return nil, errors.New("suggest service unavailable")
 }
+

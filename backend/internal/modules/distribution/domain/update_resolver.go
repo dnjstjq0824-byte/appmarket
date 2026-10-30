@@ -203,3 +203,4 @@ func BatchResolveUpdates(device DeviceSpec, installedList []InstalledAppSpec, ca
 
 	return results
 }
+

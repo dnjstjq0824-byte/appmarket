@@ -17,3 +17,4 @@ echo "HTTP/1.1 200 OK"
 echo '{"acknowledged": true, "indices": ["bn_apps_v1"], "state": "SUCCESS"}'
 
 echo "[+] OpenSearch snapshot completed successfully."
+

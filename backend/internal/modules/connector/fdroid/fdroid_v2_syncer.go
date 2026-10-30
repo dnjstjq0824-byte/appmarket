@@ -95,3 +95,4 @@ func (s *FDroidSyncer) SyncFeed(indexV2JSON []byte, feedSignatureHex string) ([]
 
 	return results, nil
 }
+
