@@ -1,0 +1,83 @@
+name: Cloudflare Pages Build & Deploy
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    name: Cloudflare Build & Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build applications and generate Cloudflare Pages distribution
+        run: pnpm run build
+
+      - name: Verify Cloudflare Pages distribution bundle
+        run: |
+          echo "Verifying Cloudflare Pages distribution output in ./dist..."
+          test -f dist/index.html || { echo "ERROR: dist/index.html is missing"; exit 1; }
+          test -f dist/admin/index.html || { echo "ERROR: dist/admin/index.html is missing"; exit 1; }
+          test -f dist/developer/index.html || { echo "ERROR: dist/developer/index.html is missing"; exit 1; }
+          test -f dist/_routes.json || { echo "ERROR: dist/_routes.json is missing"; exit 1; }
+          test -f dist/_headers || { echo "ERROR: dist/_headers is missing"; exit 1; }
+          test -f dist/_redirects || { echo "ERROR: dist/_redirects is missing"; exit 1; }
+          echo "Verification passed. All web targets and edge configurations successfully generated."
+
+      - name: Deploy to Cloudflare Pages via Wrangler Action
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=bn-app-market --branch=${{ github.ref_name }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Trigger Cloudflare Pages Deploy Hook
+        if: env.CLOUDFLARE_DEPLOY_HOOK != ''
+        run: |
+          echo "Triggering Cloudflare Pages Deploy Hook..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${{ secrets.CLOUDFLARE_DEPLOY_HOOK }}")
+          echo "Deploy hook response status: $HTTP_STATUS"
+        env:
+          CLOUDFLARE_DEPLOY_HOOK: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK }}
+
+      - name: Upload Cloudflare Pages Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-pages-dist
+          path: dist/
+          retention-days: 7
