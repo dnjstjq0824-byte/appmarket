@@ -1,9 +1,16 @@
 package domain
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"time"
 )
+
+func ComputeSHA256(data []byte) string {
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:])
+}
 
 type ArtifactType string
 
