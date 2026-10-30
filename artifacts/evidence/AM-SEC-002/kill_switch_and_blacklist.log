@@ -1,0 +1,4 @@
+﻿=== RUN   TestBlacklistedCertificateAndKillSwitch
+--- PASS: TestBlacklistedCertificateAndKillSwitch (0.00s)
+PASS
+ok  	github.com/bookingnetwork/appmarket/backend/internal/modules/security/application	1.455s

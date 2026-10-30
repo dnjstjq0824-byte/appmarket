@@ -1,0 +1,4 @@
+﻿=== RUN   TestStagedRolloutMonotonicityAndDistribution
+--- PASS: TestStagedRolloutMonotonicityAndDistribution (0.01s)
+PASS
+ok  	github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/application	1.119s

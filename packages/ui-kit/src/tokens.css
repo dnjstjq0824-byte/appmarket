@@ -1,0 +1,50 @@
+:root, [data-theme="light"] {
+  /* Surface & Background */
+  --bn-bg-canvas: #F8FAFC;
+  --bn-bg-surface: #FFFFFF;
+  --bn-bg-elevated: #F1F5F9;
+  --bn-border-subtle: #E2E8F0;
+
+  /* Text Hierarchy (WCAG AA >= 4.5:1 guaranteed) */
+  --bn-text-primary: #0F172A;
+  --bn-text-secondary: #334155;
+  --bn-text-muted: #64748B;
+
+  /* Brand & Semantic Actions */
+  --bn-primary: #2563EB;
+  --bn-primary-hover: #1D4ED8;
+  --bn-trust-verified: #059669;   /* Direct Verified APK & Clean Signature */
+  --bn-external-link: #4F46E5;    /* External Official Store Outlink */
+  --bn-warning-amber: #D97706;    /* High-Risk Permission / Signer Conflict */
+  --bn-danger-red: #DC2626;       /* Malware Quarantined / Revoked */
+}
+
+[data-theme="dark"] {
+  --bn-bg-canvas: #0B1120;
+  --bn-bg-surface: #1E293B;
+  --bn-bg-elevated: #334155;
+  --bn-border-subtle: #334155;
+  --bn-text-primary: #F8FAFC;
+  --bn-text-secondary: #CBD5E1;
+  --bn-text-muted: #94A3B8;
+  --bn-primary: #60A5FA;
+  --bn-primary-hover: #3B82F6;
+  --bn-trust-verified: #34D399;
+  --bn-external-link: #818CF8;
+  --bn-warning-amber: #FBBF24;
+  --bn-danger-red: #F87171;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bn-bg-canvas);
+  color: var(--bn-text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+code, kbd, samp, pre {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+

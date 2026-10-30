@@ -1,0 +1,8 @@
+﻿=== RUN   TestMalwareQuarantineAndReports
+--- PASS: TestMalwareQuarantineAndReports (0.00s)
+=== RUN   TestBlacklistedCertificateAndKillSwitch
+--- PASS: TestBlacklistedCertificateAndKillSwitch (0.00s)
+PASS
+ok  	github.com/bookingnetwork/appmarket/backend/internal/modules/security/application	(cached)
+?   	github.com/bookingnetwork/appmarket/backend/internal/modules/security/domain	[no test files]
+?   	github.com/bookingnetwork/appmarket/backend/internal/modules/security/scanner	[no test files]

@@ -13,24 +13,57 @@ import (
 
 // DeveloperHandler serves developer endpoints.
 type DeveloperHandler struct {
-	orgs  *application.OrgService
-	members *application.MemberService
-	keys  *application.APIKeyService
+	orgs     *application.OrgService
+	members  *application.MemberService
+	keys     *application.APIKeyService
+	identity IdentityResolver
 }
 
+// IdentityResolver must return a user ID from verified authentication only.
+// The composition root supplies the IAM adapter; request headers are not identity.
+type IdentityResolver func(*http.Request) (string, error)
+
 // NewDeveloperHandler constructs handler.
-func NewDeveloperHandler(orgs *application.OrgService, members *application.MemberService, keys *application.APIKeyService) *DeveloperHandler {
-	return &DeveloperHandler{orgs: orgs, members: members, keys: keys}
+func NewDeveloperHandler(orgs *application.OrgService, members *application.MemberService, keys *application.APIKeyService, identity ...IdentityResolver) *DeveloperHandler {
+	h := &DeveloperHandler{orgs: orgs, members: members, keys: keys}
+	if len(identity) == 1 {
+		h.identity = identity[0]
+	}
+	return h
 }
 
 // Routes returns chi router.
 func (h *DeveloperHandler) Routes() chi.Router {
 	r := chi.NewRouter()
-	r.Post("/orgs", h.handleCreateOrg)
-	r.Post("/orgs/{orgId}/verification", h.handleSubmitVerification)
-	r.Post("/orgs/{orgId}/members", h.handleAddMember)
-	r.Post("/orgs/{orgId}/api-keys", h.handleIssueAPIKey)
+	r.With(h.requirePermission("")).Post("/orgs", h.handleCreateOrg)
+	r.With(h.requirePermission("org:manage")).Post("/orgs/{orgId}/verification", h.handleSubmitVerification)
+	r.With(h.requirePermission("member:invite")).Post("/orgs/{orgId}/members", h.handleAddMember)
+	r.With(h.requirePermission("org:manage")).Post("/orgs/{orgId}/api-keys", h.handleIssueAPIKey)
 	return r
+}
+
+func (h *DeveloperHandler) requirePermission(permission string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if h.identity == nil {
+				errors.WriteProblem(w, http.StatusUnauthorized, "ERR_UNAUTHORIZED", "Authentication required", r.URL.Path)
+				return
+			}
+			userID, err := h.identity(r)
+			if err != nil || userID == "" {
+				errors.WriteProblem(w, http.StatusUnauthorized, "ERR_UNAUTHORIZED", "Authentication required", r.URL.Path)
+				return
+			}
+			if permission != "" {
+				orgID := chi.URLParam(r, "orgId")
+				if orgID == "" || h.members == nil || h.members.CheckPermission(r.Context(), orgID, userID, permission) != nil {
+					errors.WriteProblem(w, http.StatusForbidden, "ERR_FORBIDDEN_TENANT_ACCESS", "Forbidden tenant access", r.URL.Path)
+					return
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 type createOrgReq struct {
@@ -59,9 +92,9 @@ func (h *DeveloperHandler) handleCreateOrg(w http.ResponseWriter, r *http.Reques
 }
 
 type submitVerificationReq struct {
-	DocType    string `json:"doc_type"`
-	DocURL     string `json:"doc_url"`
-	Domain     string `json:"domain"`
+	DocType string `json:"doc_type"`
+	DocURL  string `json:"doc_url"`
+	Domain  string `json:"domain"`
 }
 
 func (h *DeveloperHandler) handleSubmitVerification(w http.ResponseWriter, r *http.Request) {
@@ -112,10 +145,10 @@ func (h *DeveloperHandler) handleAddMember(w http.ResponseWriter, r *http.Reques
 }
 
 type issueKeyReq struct {
-	Name   string   `json:"name"`
-	Scopes []string `json:"scopes"`
-	TTLDays int     `json:"ttl_days"`
-	AppID  *string  `json:"app_id,omitempty"`
+	Name    string   `json:"name"`
+	Scopes  []string `json:"scopes"`
+	TTLDays int      `json:"ttl_days"`
+	AppID   *string  `json:"app_id,omitempty"`
 }
 
 func (h *DeveloperHandler) handleIssueAPIKey(w http.ResponseWriter, r *http.Request) {
@@ -131,8 +164,8 @@ func (h *DeveloperHandler) handleIssueAPIKey(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	resp := map[string]any{
-		"api_key":   raw,
-		"record":    k,
+		"api_key": raw,
+		"record":  k,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

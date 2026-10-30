@@ -1,0 +1,4 @@
+﻿=== RUN   TestSignatureMismatchRejection
+--- PASS: TestSignatureMismatchRejection (0.13s)
+PASS
+ok  	github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/application	2.566s

@@ -1,0 +1,4 @@
+﻿=== RUN   TestAPKParserAndV1Rejection
+--- PASS: TestAPKParserAndV1Rejection (0.12s)
+PASS
+ok  	github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/application	1.086s

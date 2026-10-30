@@ -1,0 +1,14 @@
+﻿=== RUN   TestStagedRolloutMonotonicityAndDistribution
+--- PASS: TestStagedRolloutMonotonicityAndDistribution (0.01s)
+=== RUN   TestReleaseStateMachineTransitions
+--- PASS: TestReleaseStateMachineTransitions (0.00s)
+=== RUN   TestAPKParserAndV1Rejection
+--- PASS: TestAPKParserAndV1Rejection (0.07s)
+=== RUN   TestSignatureMismatchRejection
+--- PASS: TestSignatureMismatchRejection (0.09s)
+=== RUN   TestZipBombAndZipSlipRejection
+--- PASS: TestZipBombAndZipSlipRejection (0.00s)
+PASS
+ok  	github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/application	(cached)
+?   	github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/domain	[no test files]
+?   	github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/infrastructure	[no test files]
