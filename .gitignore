@@ -12,3 +12,4 @@ backend/bin/
 
 .gradle/
 **/build/
+.output/
