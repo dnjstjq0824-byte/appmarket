@@ -24,3 +24,4 @@
 - `TC-FUNC-005`: Honest outlink vs direct download enforcement verified; 0 fake download buttons.
 - `TC-UI-003`: Responsive facets, search debouncing, WCAG AA compliant contrast verified.
 - 0% dummy/mock bypass: all views make typed API calls matching backend contracts.
+

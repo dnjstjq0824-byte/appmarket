@@ -1,0 +1,74 @@
+# AM-OPS-003: Web Application Firewall (WAF) Security Rule Set
+# Compatible with Cloudflare WAF, AWS WAF, and ModSecurity/Ingress-Nginx
+
+version: "2.1"
+waf_name: "appmarket-production-waf-shield"
+
+rules:
+  - id: "WAF-SANCTIONS-001"
+    name: "OFAC & International Sanctions Compliance Block"
+    action: "block"
+    response_code: 451
+    response_body: "Unavailable For Legal Reasons: Access from sanctioned jurisdiction is prohibited."
+    condition:
+      field: "client.geo.country"
+      operator: "in"
+      values: ["KP", "IR", "CU", "SY"]
+
+  - id: "WAF-RATE-AUTH-002"
+    name: "Authentication Brute-Force Rate Limiting"
+    action: "rate_limit"
+    rate_limit:
+      threshold: 30
+      period: "1m"
+      action: "block"
+      duration: "15m"
+    condition:
+      field: "http.request.uri.path"
+      operator: "matches"
+      pattern: "^/api/v1/auth/(login|refresh|register|totp)"
+
+  - id: "WAF-RATE-PUBLIC-003"
+    name: "General Public API Sliding Window Rate Limiting"
+    action: "rate_limit"
+    rate_limit:
+      threshold: 300
+      period: "1m"
+      action: "throttle"
+      status_code: 429
+    condition:
+      field: "http.request.uri.path"
+      operator: "starts_with"
+      pattern: "/api/v1/"
+
+  - id: "WAF-SQLI-004"
+    name: "SQL Injection Detection & Block"
+    action: "block"
+    response_code: 403
+    condition:
+      field: "http.request.uri.query"
+      operator: "matches_regex"
+      pattern: "(?i)(union.*select|select.*from|insert.*into|drop.*table|truncate.*table|exec.*xp_|1=1|--|;)"
+
+  - id: "WAF-TRAVERSAL-005"
+    name: "Path Traversal & LFI Attack Block"
+    action: "block"
+    response_code: 403
+    condition:
+      field: "http.request.uri.path"
+      operator: "matches_regex"
+      pattern: "(\\.\\./|\\.\\.\\\\|/etc/passwd|/proc/|win\\.ini)"
+
+  - id: "WAF-ADS-BOT-006"
+    name: "Click Fraud & Sub-300ms Click Burst Bot Filter"
+    action: "challenge_or_block"
+    response_code: 403
+    condition:
+      field: "http.request.uri.path"
+      operator: "starts_with"
+      pattern: "/api/v1/ads/click"
+      and:
+        - field: "http.request.headers.user_agent"
+          operator: "matches_regex"
+          pattern: "(?i)(curl|wget|python-requests|headlesschrome|phantomjs|puppeteer|bot|crawl)"
+

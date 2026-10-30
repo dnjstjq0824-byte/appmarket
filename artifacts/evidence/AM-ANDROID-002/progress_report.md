@@ -25,3 +25,4 @@
 ## 2. Test Execution & Evidence
 - `TC-AND-001`: Passed (SHA-256 stream integrity and 1-byte alteration rejection).
 - `TC-AND-002`: Passed (5-stage verification and PackageInstaller session error recovery).
+

@@ -18,3 +18,4 @@
   - Log: `artifacts/evidence/AM-SEC-003/kms_envelope_encryption_test.log`
 - `TC-API-001`: Passed (5 initial requests permitted, 6th rejected with HTTP 429, window expiry auto-resets allowance).
   - Log: `artifacts/evidence/AM-SEC-003/rate_limit_sliding_window_test.log`
+

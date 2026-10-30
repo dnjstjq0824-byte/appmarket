@@ -198,3 +198,4 @@ async function submitReport() {
 .btn-primary { background: #2563eb; color: white; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
+

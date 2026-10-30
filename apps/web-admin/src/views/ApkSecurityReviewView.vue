@@ -234,3 +234,4 @@ async function approveSecurity() {
 .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn-danger { background: #dc2626; color: white; }
 </style>
+

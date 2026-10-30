@@ -52,3 +52,4 @@ type ClickResult struct {
 	IsFraud     bool   `json:"is_fraud"`
 	FraudReason string `json:"fraud_reason,omitempty"`
 }
+

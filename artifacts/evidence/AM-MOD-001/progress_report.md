@@ -20,3 +20,4 @@
   - Log: `artifacts/evidence/AM-MOD-001/verified_reviews_and_fraud_test.log`
 - `TC-FUNC-013`: Passed (Dual-control appeal decision blocks self-approval by original reviewer).
   - Log: `artifacts/evidence/AM-MOD-001/appeal_dual_control_test.log`
+

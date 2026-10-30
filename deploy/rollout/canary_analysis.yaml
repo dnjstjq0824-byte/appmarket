@@ -1,0 +1,67 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: appmarket-backend-rollout
+  namespace: production
+  labels:
+    app.kubernetes.io/name: appmarket-backend
+    app.kubernetes.io/part-of: commercial-appmarket
+spec:
+  replicas: 10
+  strategy:
+    canary:
+      analysis:
+        templates:
+          - templateName: appmarket-canary-metric-analysis
+        args:
+          - name: service-name
+            value: appmarket-backend-canary
+      steps:
+        - setWeight: 5
+        - pause: { duration: 3m }
+        - setWeight: 10
+        - pause: { duration: 5m }
+        - setWeight: 25
+        - pause: { duration: 5m }
+        - setWeight: 50
+        - pause: { duration: 5m }
+      antiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: app.kubernetes.io/name
+                    operator: In
+                    values: ["appmarket-backend"]
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: appmarket-canary-metric-analysis
+  namespace: production
+spec:
+  metrics:
+    - name: http-error-rate
+      interval: 30s
+      successCondition: result[0] < 0.01  # HTTP 5xx error rate must stay below 1.0%
+      failureLimit: 2                     # 2 consecutive violations trigger immediate rollback
+      provider:
+        prometheus:
+          address: http://prometheus-k8s.monitoring:9090
+          query: |
+            sum(rate(http_requests_total{status=~"5.*", service="appmarket-backend-canary"}[1m]))
+            /
+            sum(rate(http_requests_total{service="appmarket-backend-canary"}[1m]))
+
+    - name: http-latency-p99
+      interval: 30s
+      successCondition: result[0] < 2.0   # p99 latency must stay below 2.0 seconds (2000ms)
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://prometheus-k8s.monitoring:9090
+          query: |
+            histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{service="appmarket-backend-canary"}[1m])) by (le))
+

@@ -45,3 +45,4 @@ class HttpRangeDownloaderTest {
         assertTrue("Single-byte alteration must result in checksum mismatch", isMismatched)
     }
 }
+

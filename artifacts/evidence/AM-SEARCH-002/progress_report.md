@@ -23,3 +23,4 @@
   - Log: `artifacts/evidence/AM-SEARCH-002/rights_guard_and_provenance_test.log`
 - `TC-SEC-003`: Passed (Cryptographic digest verification, tampered payload rejection with `ABORTED_SIGNATURE_INVALID`, spoofed certificate fingerprint rejection).
   - Log: `artifacts/evidence/AM-SEARCH-002/external_index_signature_test.log`
+

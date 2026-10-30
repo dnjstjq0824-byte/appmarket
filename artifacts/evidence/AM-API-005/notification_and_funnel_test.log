@@ -1,0 +1,8 @@
+﻿=== RUN   TestNotification_TC_OPS_006_ResilienceAndCircuitBreaker
+--- PASS: TestNotification_TC_OPS_006_ResilienceAndCircuitBreaker (0.12s)
+PASS
+ok  	github.com/bookingnetwork/appmarket/backend/internal/modules/notification	0.754s
+=== RUN   TestFunnelAnalytics_TC_FUNC_014_EventIngestionAndRollup
+--- PASS: TestFunnelAnalytics_TC_FUNC_014_EventIngestionAndRollup (0.00s)
+PASS
+ok  	github.com/bookingnetwork/appmarket/backend/internal/modules/analytics	0.626s

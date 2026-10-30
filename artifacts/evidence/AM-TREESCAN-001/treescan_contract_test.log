@@ -1,0 +1,6 @@
+﻿=== RUN   TestTreeScan_TC_API_003_FederatedSearchAndFeedContract
+--- PASS: TestTreeScan_TC_API_003_FederatedSearchAndFeedContract (0.00s)
+=== RUN   TestTreeScan_TC_OPS_008_RFC8693SSOTokenExchange
+--- PASS: TestTreeScan_TC_OPS_008_RFC8693SSOTokenExchange (0.00s)
+PASS
+ok  	github.com/bookingnetwork/appmarket/backend/internal/modules/treescan	0.748s

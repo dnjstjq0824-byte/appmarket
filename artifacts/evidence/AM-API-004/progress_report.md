@@ -12,3 +12,4 @@
 ## 2. Test Execution & Evidence
 - `TC-SEC-004`: Passed (Legal sanctions override, developer geo-blocking, adult age certification mandate).
   - Log: `artifacts/evidence/AM-API-004/test_output.log`
+

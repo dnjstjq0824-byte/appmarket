@@ -31,3 +31,4 @@
 - `TC-FUNC-013`: Mandatory 4-item checklist enforcement and conditional approval button activation verified.
 - `TC-SEC-009`: Threat detection display and kill-switch revocation flow verified.
 - 0% dummy/mock bypass: all views make typed API calls matching backend contracts.
+

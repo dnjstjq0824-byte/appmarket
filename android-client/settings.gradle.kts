@@ -21,3 +21,4 @@ include(":core:installer")
 include(":feature:home")
 include(":feature:detail")
 include(":feature:updates")
+

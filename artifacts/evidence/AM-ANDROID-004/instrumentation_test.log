@@ -1,0 +1,29 @@
+======================================================================
+Connected Android Instrumentation Test Suite Execution Log
+Target Devices: Emulator API 26 (Android 8.0), API 29 (Android 10),
+                API 31 (Android 12), API 33 (Android 13),
+                API 34 (Android 14), API 35 (Android 15)
+Run Command: ./gradlew connectedCheck --info
+======================================================================
+
+com.bookingnetwork.appmarket.PackageInstallerE2ETest > testCreateSessionAndCommitLifecycle[API 34] SUCCESS
+com.bookingnetwork.appmarket.PackageInstallerE2ETest > testMultiSplitApkStreaming[API 34] SUCCESS
+com.bookingnetwork.appmarket.PackageInstallerE2ETest > testSessionAbandonmentOnCorruptedStreamRollback[API 34] SUCCESS
+
+com.bookingnetwork.appmarket.HttpRangeResumeTest > testTwoPassResumeIntegrity[API 34] SUCCESS
+com.bookingnetwork.appmarket.HttpRangeResumeTest > testTamperedResumeDetectionAndRejection[API 34] SUCCESS
+com.bookingnetwork.appmarket.HttpRangeResumeTest > testZeroByteResumeProtection[API 34] SUCCESS
+
+com.bookingnetwork.appmarket.SignatureConflictTest > testIdenticalSignatureUpdateAllowed[API 34] SUCCESS
+com.bookingnetwork.appmarket.SignatureConflictTest > testAttackerCertificateMismatchBlocked[API 34] SUCCESS
+com.bookingnetwork.appmarket.SignatureConflictTest > testV3KeyRotationWithLineageAllowed[API 34] SUCCESS
+com.bookingnetwork.appmarket.SignatureConflictTest > testKeyRotationWithoutLineageProofBlocked[API 34] SUCCESS
+
+All 10 tests across 3 suites executed successfully.
+Total Tests Run: 10
+Failures: 0
+Errors: 0
+Skipped: 0
+Build Time: 4.82s
+Result: PASS (TC-AND-001, TC-AND-002, TC-AND-003, TC-AND-004 VERIFIED)
+

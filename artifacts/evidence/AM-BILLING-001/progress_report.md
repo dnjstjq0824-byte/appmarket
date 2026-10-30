@@ -27,3 +27,4 @@
 - `TC-COM-002`: Passed (Unentitled users blocked with `ERR_ENTITLEMENT_REQUIRED`, purchased users granted access).
   - Log: `artifacts/evidence/AM-BILLING-001/entitlement_verification_test.log`
 - `TC-COM-004` & `TC-COM-005`: Passed (Zero-sum double-entry balance and minor unit rounding precision).
+

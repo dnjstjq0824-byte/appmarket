@@ -33,3 +33,4 @@
   - Log: `artifacts/evidence/AM-DIST-002/update_compatibility_matrix_test.log`
 - `TC-OPS-003`: Passed (6 scenarios including promotion, immutable overwrite block, 15m signed URL, expired URL 403, kill switch revocation, and external link block).
   - Log: `artifacts/evidence/AM-DIST-002/cdn_signed_url_expiry_test.log`
+

@@ -133,3 +133,4 @@ fun ConflictingUpdateCard(app: AppUpdateItem) {
         }
     }
 }
+

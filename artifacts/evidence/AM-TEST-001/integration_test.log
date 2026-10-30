@@ -1,0 +1,22 @@
+﻿=== RUN   TestFullPlatformLifecycle_E2E
+    full_lifecycle_test.go:42: ===> Step 1: Initializing Platform Subsystems...
+    full_lifecycle_test.go:76: ===> Step 2: Developer Uploads APK and CDN Issues 15-Minute Download Token
+    full_lifecycle_test.go:101: CDN Signed Download URL generated and verified: https://cdn.appmarket.local/packages/app-omnipro-0...
+    full_lifecycle_test.go:103: ===> Step 3: Device 4D Compatibility Verification
+    full_lifecycle_test.go:135: Device 4D compatibility check PASSED
+    full_lifecycle_test.go:137: ===> Step 4: Telemetry Funnel Event Ingestion & Daily Rollup
+    full_lifecycle_test.go:198: Funnel telemetry and KPI daily rollup PASSED
+    full_lifecycle_test.go:200: ===> Step 5: Verified Review Submission (Gated by Installation Proof)
+    full_lifecycle_test.go:235: Verified installer review gating PASSED
+    full_lifecycle_test.go:237: ===> Step 6: Commercial Paid App Purchase & Double-Entry Ledger Posting
+    full_lifecycle_test.go:279: Payment processing, active entitlement & ledger zero-sum audit PASSED
+    full_lifecycle_test.go:281: ===> Step 7: Statutory 14-Day Refund & Immediate Entitlement Revocation
+    full_lifecycle_test.go:301: Statutory refund, entitlement revocation & reverse journal entry PASSED
+    full_lifecycle_test.go:303: ===> Step 8: Sponsored Search Ads & Click Fraud Protection
+    full_lifecycle_test.go:346: Sponsored ads click fraud defense PASSED
+    full_lifecycle_test.go:348: ===> Step 9: KMS Field Envelope Encryption & Blind Indexing
+    full_lifecycle_test.go:362: Envelope KMS encryption and blind indexing PASSED
+    full_lifecycle_test.go:364: ===> ALL 9 PLATFORM LIFECYCLE PHASES COMPLETED WITH 100% PASS RATE
+--- PASS: TestFullPlatformLifecycle_E2E (0.00s)
+PASS
+ok  	github.com/bookingnetwork/appmarket/backend/test/integration	0.756s

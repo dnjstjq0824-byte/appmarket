@@ -103,3 +103,4 @@ func (f *ClickFraudFilter) ProcessAdClick(ctx context.Context, token domain.Impr
 		IsFraud:       false,
 	}, nil
 }
+

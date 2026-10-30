@@ -68,3 +68,4 @@ class UpdateAndSelfUpdateTest {
         ) { _, _, _ -> null } as android.content.Context
     }
 }
+

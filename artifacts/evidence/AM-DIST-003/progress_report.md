@@ -16,3 +16,4 @@
 ## 2. Test Execution & Evidence
 - `TC-FUNC-009`: Passed (Valid AAB structure creates universal APK, malformed archive rejected).
   - Log: `artifacts/evidence/AM-DIST-003/test_output.log`
+

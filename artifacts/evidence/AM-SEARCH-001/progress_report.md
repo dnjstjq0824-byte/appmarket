@@ -22,3 +22,4 @@
   - Log: `artifacts/evidence/AM-SEARCH-001/ranking_and_autocomplete_test.log`
 - `TC-OPS-005`: Passed (OpenSearch outage simulation triggers seamless fallback with FallbackUsed=true).
   - Log: `artifacts/evidence/AM-SEARCH-001/search_circuit_breaker_test.log`
+

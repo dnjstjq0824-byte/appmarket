@@ -59,3 +59,4 @@ self.onmessage = async (event: MessageEvent<{ file: File; chunkSize?: number }>)
     });
   }
 };
+

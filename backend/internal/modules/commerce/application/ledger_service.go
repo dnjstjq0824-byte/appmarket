@@ -88,3 +88,28 @@ func (s *LedgerService) GetTransactionCount() int {
 	defer s.mu.RUnlock()
 	return len(s.transactions)
 }
+
+// VerifyZeroSumInvariant audits all recorded ledger transactions and verifies sum(Debits) == sum(Credits)
+func (s *LedgerService) VerifyZeroSumInvariant(ctx context.Context) (bool, int64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var totalDebits int64 = 0
+	var totalCredits int64 = 0
+
+	for _, tx := range s.transactions {
+		for _, entry := range tx.Entries {
+			if entry.Type == domain.EntryDebit {
+				totalDebits += entry.Amount
+			} else {
+				totalCredits += entry.Amount
+			}
+		}
+	}
+
+	diff := totalDebits - totalCredits
+	if diff != 0 {
+		return false, diff, domain.ErrLedgerUnbalanced
+	}
+	return true, 0, nil
+}

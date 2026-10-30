@@ -21,3 +21,4 @@
 ## 2. Test Execution & Evidence
 - `TC-FUNC-011`: Passed (Bayesian rating manipulation prevention, NEW_NOTEWORTHY 30-day cutoff, TRENDING_RISING 48-hour velocity, Similar Apps category & tag overlap).
   - Log: `artifacts/evidence/AM-API-006/test_output.log`
+

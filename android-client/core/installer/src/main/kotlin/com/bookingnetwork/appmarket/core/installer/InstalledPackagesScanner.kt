@@ -85,3 +85,4 @@ class InstalledPackagesScanner(private val context: Context) {
         }
     }
 }
+

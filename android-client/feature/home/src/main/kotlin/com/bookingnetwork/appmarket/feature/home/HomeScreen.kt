@@ -115,3 +115,4 @@ fun AppListItem(app: AppFeedItem, onClick: () -> Unit) {
         )
     }
 }
+

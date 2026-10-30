@@ -17,3 +17,4 @@
 ## 2. Test Execution & Evidence
 - `TC-COM-003`: Passed (GSP auction winner calculation, 50 continuous clicks charging exactly 1st click, fast bot click rejection, daily budget cap pause).
   - Log: `artifacts/evidence/AM-ADS-001/test_output.log`
+

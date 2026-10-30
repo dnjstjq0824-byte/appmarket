@@ -19,3 +19,4 @@
 ## 2. Test Execution & Evidence
 - `TC-AND-003`: Passed (Installed package scan, downgrade rejection, signature continuity).
 - `TC-AND-004`: Passed (Hardcoded certificate pinning and tamper detection).
+

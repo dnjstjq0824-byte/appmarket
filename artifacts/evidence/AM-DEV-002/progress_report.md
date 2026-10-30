@@ -29,3 +29,4 @@
 - `TC-FUNC-007`: Staged rollout percentage controls and monotonicity enforcement verified.
 - `TC-FUNC-008`: 12-state release transition and rollback prevention reflected in UI states.
 - 0% dummy/mock bypass: all views make typed API calls matching backend contracts.
+

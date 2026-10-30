@@ -174,3 +174,4 @@ func (c *ChartCalculator) CalculateChart(chartType ChartType, apps []CatalogAppM
 
 	return results
 }
+

@@ -255,3 +255,4 @@ const lineageStatusDescription = computed(
   line-height: 1.6;
 }
 </style>
+
