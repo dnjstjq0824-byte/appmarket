@@ -254,3 +254,4 @@ classDiagram
 
 ---
 *본 문서는 BookingNetwork App Market 플랫폼의 상용 100% 납품 표준 규격서이며, 정의된 모든 사양은 마스터 청사진 및 관련 법규를 준수합니다.*
+

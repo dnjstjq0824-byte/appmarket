@@ -1,5 +1,24 @@
 <template>
   <div class="bn-playstore-root" :data-theme="currentTheme">
+    <!-- Smart App Banner for Android Companion Agent -->
+    <div v-if="showSmartBanner" class="smart-companion-banner">
+      <div class="banner-inner">
+        <button class="banner-close" @click="showSmartBanner = false" title="배너 닫기">✕</button>
+        <div class="banner-icon">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="#01875F">
+            <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-1.0003s.4482-1.0003.9993-1.0003c.551 0 .9992.4486.9992 1.0003s-.4482 1.0003-.9992 1.0003m-11.046 0c-.5511 0-.9993-.4486-.9993-1.0003s.4482-1.0003.9993-1.0003c.5511 0 .9993.4486.9993 1.0003s-.4482 1.0003-.9993 1.0003m11.4045-6.02l1.996-3.4566c.1154-.1994.0471-.4535-.1527-.5688-.1994-.1152-.4535-.0471-.5688.1528l-2.0223 3.5024c-1.5791-.7197-3.3444-1.127-5.2347-1.127-1.8903 0-3.6556.4073-5.2347 1.127L4.6409 5.4491c-.1153-.1999-.3694-.268-.5688-.1528-.1998.1153-.2681.3694-.1527.5688l1.996 3.4566C2.6889 11.0867 0 14.6738 0 18.9167h24c0-4.2429-2.6889-7.83-5.8815-9.5953"/>
+          </svg>
+        </div>
+        <div class="banner-text">
+          <strong>BookingNetwork 모바일 공식 앱</strong>
+          <span>PackageInstaller 백그라운드 무인 설치 및 85% 차분 업데이트 지원</span>
+        </div>
+        <button class="banner-download-btn" @click="downloadCompanionApp">
+          앱 설치 (APK)
+        </button>
+      </div>
+    </div>
+
     <!-- Google Play Style Sticky Top Navigation Header -->
     <header class="play-header">
       <div class="play-header-container">
@@ -236,11 +255,18 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+const showSmartBanner = ref(true)
 const currentTheme = ref<'light' | 'dark'>('dark')
 const activeTopTab = ref<'games' | 'apps' | 'charts' | 'editors' | 'protect'>('apps')
 const searchQuery = ref('')
 const searchFocused = ref(false)
 const profileMenuOpen = ref(false)
+
+function downloadCompanionApp() {
+  if (typeof window !== 'undefined') {
+    window.location.href = '/api/v1/distribution/tokens'
+  }
+}
 
 const quickSuggestions = [
   'Omni Productivity Suite',
@@ -345,6 +371,88 @@ onMounted(() => {
   --play-pill-text: #80CBC4;
   --play-shadow: 0 2px 6px rgba(0,0,0,0.4);
   --play-hover-shadow: 0 10px 30px rgba(0,0,0,0.6);
+}
+
+/* Smart Companion Banner */
+.smart-companion-banner {
+  background: linear-gradient(90deg, #0d3826 0%, #122820 100%);
+  border-bottom: 1px solid rgba(1, 135, 95, 0.4);
+  padding: 8px 16px;
+  position: relative;
+  z-index: 1001;
+}
+
+.banner-inner {
+  max-width: 1360px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.banner-close {
+  background: transparent;
+  border: none;
+  color: #9AA0A6;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: color 0.15s;
+}
+
+.banner-close:hover {
+  color: #fff;
+}
+
+.banner-icon {
+  width: 32px;
+  height: 32px;
+  background: rgba(1, 135, 95, 0.2);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.banner-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.banner-text strong {
+  color: #E8EAED;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.banner-text span {
+  color: #9AA0A6;
+}
+
+.banner-download-btn {
+  background-color: var(--play-accent);
+  color: #ffffff;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 18px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, transform 0.1s;
+}
+
+.banner-download-btn:hover {
+  background-color: var(--play-accent-hover);
+  transform: translateY(-1px);
 }
 
 /* Header Navbar */
