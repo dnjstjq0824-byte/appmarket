@@ -11,3 +11,4 @@ data:
   OPENSEARCH_URL: "http://opensearch.bn-appmarket.svc.cluster.local:9200"
   RATE_LIMIT_RPS: "5000"
   TREESCAN_MODE: "STANDALONE_ISOLATED"
+

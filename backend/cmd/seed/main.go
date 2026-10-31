@@ -110,3 +110,4 @@ func main() {
 	logger.Info("database successfully seeded with production reference records")
 	fmt.Println("Database seeded successfully.")
 }
+

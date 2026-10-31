@@ -116,3 +116,4 @@ func main() {
 	logger.Info("all database migrations completed successfully")
 	fmt.Println("Database schema up to date.")
 }
+
