@@ -329,3 +329,4 @@ func (r *PostgresMFARepository) SaveMFACredential(ctx context.Context, cred *dom
 	)
 	return err
 }
+

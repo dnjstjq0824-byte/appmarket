@@ -159,4 +159,11 @@ func TestMountedDomainRoutes(t *testing.T) {
 	if wDev.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 Unauthorized from unauthenticated /api/v1/developer/orgs, got %d: %s", wDev.Code, wDev.Body.String())
 	}
+
+	// 5. Commerce PG webhook route returns 401 Unauthorized when signature missing
+	wCommerce := httptest.NewRecorder()
+	h.ServeHTTP(wCommerce, httptest.NewRequest(http.MethodPost, "/api/v1/commerce/webhooks/pg", strings.NewReader(`{"order_id":"ord-1","status":"PAID"}`)))
+	if wCommerce.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 Unauthorized from unsigned /api/v1/commerce/webhooks/pg, got %d: %s", wCommerce.Code, wCommerce.Body.String())
+	}
 }

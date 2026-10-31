@@ -169,3 +169,4 @@ func (p *PostgresCandidateProvider) GetCandidatesForPackages(ctx context.Context
 
 	return result, nil
 }
+

@@ -153,6 +153,29 @@ func (s *OrderService) GetEntitlement(userID, appID string) *domain.UserEntitlem
 	return s.entitlements[userID+":"+appID]
 }
 
+func (s *OrderService) GetOrder(orderID string) (*domain.Order, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	order, exists := s.orders[orderID]
+	if !exists {
+		return nil, errors.New("order not found")
+	}
+	copyO := *order
+	return &copyO, nil
+}
+
+func (s *OrderService) ListUserEntitlements(userID string) []domain.UserEntitlement {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var list []domain.UserEntitlement
+	for _, ent := range s.entitlements {
+		if ent.UserID == userID && ent.Status == domain.EntitlementActive {
+			list = append(list, *ent)
+		}
+	}
+	return list
+}
+
 func (s *OrderService) verifySignature(payload []byte, signatureHex string) bool {
 	if len(s.webhookSecret) == 0 {
 		return true

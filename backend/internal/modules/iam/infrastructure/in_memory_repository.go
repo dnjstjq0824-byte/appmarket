@@ -269,3 +269,4 @@ func (r *InMemoryMFARepository) SaveMFACredential(ctx context.Context, cred *dom
 	r.creds[cred.UserID] = cred
 	return nil
 }
+

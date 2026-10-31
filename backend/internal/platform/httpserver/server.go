@@ -30,6 +30,10 @@ import (
 	developerInfra "github.com/bookingnetwork/appmarket/backend/internal/modules/developer/infrastructure"
 	developerPres "github.com/bookingnetwork/appmarket/backend/internal/modules/developer/presentation"
 
+	commerceApp "github.com/bookingnetwork/appmarket/backend/internal/modules/commerce/application"
+	commercePres "github.com/bookingnetwork/appmarket/backend/internal/modules/commerce/presentation"
+	commerceSet "github.com/bookingnetwork/appmarket/backend/internal/modules/commerce/settlement"
+
 	distributionApp "github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/application"
 	distributionInfra "github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/infrastructure"
 	distributionPres "github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/presentation"
@@ -65,6 +69,7 @@ type Server struct {
 	developerHandler    *developerPres.DeveloperHandler
 	distributionHandler *distributionPres.DistributionHandler
 	authHandler         *iamPres.AuthHandler
+	commerceHandler     *commercePres.CommerceHandler
 }
 
 func New(cfg Config) (*Server, error) {
@@ -148,6 +153,13 @@ func New(cfg Config) (*Server, error) {
 	candidateProvider := distributionInfra.NewPostgresCandidateProvider(cfg.DB)
 	s.distributionHandler = distributionPres.NewDistributionHandler(tokenSvc, candidateProvider)
 
+	// 5. Commerce domain wiring
+	ledgerSvc := commerceApp.NewLedgerService()
+	pgWebhookSecret := "appmarket-pg-live-webhook-secret-v1"
+	orderSvc := commerceApp.NewOrderService(ledgerSvc, pgWebhookSecret)
+	refundSvc := commerceSet.NewRefundService(ledgerSvc, orderSvc)
+	s.commerceHandler = commercePres.NewCommerceHandler(orderSvc, refundSvc, identityResolver)
+
 	return s, nil
 }
 
@@ -170,6 +182,9 @@ func (s *Server) Handler() http.Handler {
 	}
 	if s.authHandler != nil {
 		r.Mount("/api/v1/auth", s.authHandler.Routes())
+	}
+	if s.commerceHandler != nil {
+		r.Mount("/api/v1/commerce", s.commerceHandler.Routes())
 	}
 
 	r.NotFound(func(w http.ResponseWriter, req *http.Request) {

@@ -131,3 +131,4 @@ func TestIAMRepositories_Lifecycle(t *testing.T) {
 		t.Fatalf("expected MFA cred recovered: %+v, err=%v", foundCred, err)
 	}
 }
+
