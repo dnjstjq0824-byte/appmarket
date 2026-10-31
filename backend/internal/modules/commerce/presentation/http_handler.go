@@ -217,3 +217,4 @@ func (h *CommerceHandler) handleListEntitlements(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(entitlements)
 }
+

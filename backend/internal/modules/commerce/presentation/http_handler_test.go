@@ -139,3 +139,4 @@ func TestCommerceHandler_FullLifecycle(t *testing.T) {
 		t.Fatalf("expected entitlement revoked after refund, got %s", entAfter.Status)
 	}
 }
+

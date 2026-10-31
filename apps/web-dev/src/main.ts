@@ -15,7 +15,7 @@ import AppPricingEditorView from './views/commerce/AppPricingEditorView.vue';
 import PromoCodeManagerView from './views/commerce/PromoCodeManagerView.vue';
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/developer/'),
   routes: [
     { path: '/', component: KybVerificationView },
     { path: '/releases/upload', component: ApkUploaderView },

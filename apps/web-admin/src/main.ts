@@ -16,7 +16,7 @@ import PlatformAnalyticsAdminView from './views/PlatformAnalyticsAdminView.vue';
 import SettlementPayoutAdminView from './views/SettlementPayoutAdminView.vue';
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/admin/'),
   routes: [
     { path: '/', component: AdminOverviewDashboard },
     { path: '/rbac', component: AdminRbacDualControlView },
