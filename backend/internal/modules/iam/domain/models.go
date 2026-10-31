@@ -21,6 +21,7 @@ var (
 	ErrInvalidCredentials        = errors.New("invalid email or password")
 	ErrAccountLocked             = errors.New("ERR_ACCOUNT_LOCKED: account locked due to consecutive failed logins")
 	ErrTokenReuseDetected        = errors.New("ERR_TOKEN_REUSE_DETECTED: refresh token reuse detected, family revoked")
+	ErrSessionNotFound           = errors.New("session not found")
 	ErrSessionExpired            = errors.New("ERR_SESSION_EXPIRED: session has expired")
 	ErrSessionRevoked            = errors.New("ERR_SESSION_REVOKED: session has been revoked")
 	ErrMFARequired               = errors.New("ERR_MFA_REQUIRED: multi-factor authentication is required")

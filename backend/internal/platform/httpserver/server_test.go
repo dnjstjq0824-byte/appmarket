@@ -81,6 +81,7 @@ func TestReadinessFailsClosedWhileLivenessRemainsAvailable(t *testing.T) {
 	s, err := New(Config{
 		DB: db, Redis: cache, OpenSearchURL: probe.URL, S3HealthURL: probe.URL,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		DisableRateLimit: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -102,5 +103,60 @@ func TestReadinessFailsClosedWhileLivenessRemainsAvailable(t *testing.T) {
 	}
 	if state["postgres"] != "DOWN" || state["redis"] != "DOWN" || state["opensearch"] != "UP" || state["s3"] != "UP" {
 		t.Fatalf("unexpected dependency state: %#v", state)
+	}
+}
+
+func TestMountedDomainRoutes(t *testing.T) {
+	probe := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	defer probe.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	db, err := pgxpool.New(ctx, "postgres://unused:unused@127.0.0.1:1/unused?sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	cache := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1"})
+	defer cache.Close()
+
+	s, err := New(Config{
+		DB: db, Redis: cache, OpenSearchURL: probe.URL, S3HealthURL: probe.URL,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		DisableRateLimit: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := s.Handler()
+
+	// 1. Catalog apps route returns 200 OK
+	wCat := httptest.NewRecorder()
+	h.ServeHTTP(wCat, httptest.NewRequest(http.MethodGet, "/api/v1/catalog/apps", nil))
+	if wCat.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from /api/v1/catalog/apps, got %d: %s", wCat.Code, wCat.Body.String())
+	}
+
+	// 2. Auth discovery route returns 200 OK
+	wAuth := httptest.NewRecorder()
+	h.ServeHTTP(wAuth, httptest.NewRequest(http.MethodGet, "/api/v1/auth/.well-known/openid-configuration", nil))
+	if wAuth.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from /api/v1/auth/.well-known/openid-configuration, got %d: %s", wAuth.Code, wAuth.Body.String())
+	}
+
+	// 3. Distribution check-updates route returns 200 OK
+	checkBody := `{"device":{"sdk_int":34,"supported_abis":["arm64-v8a"],"density_dpi":440,"available_features":[],"device_hash":"dev-1"},"packages":[{"package_name":"com.omniwork.pro","version_code":100,"cert_sha256":"A1B2C3D4E5F67890123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0","installer_package_name":"com.bookingnetwork.appmarket"}]}`
+	reqDist := httptest.NewRequest(http.MethodPost, "/api/v1/distribution/device/check-updates", strings.NewReader(checkBody))
+	reqDist.Header.Set("Content-Type", "application/json")
+	wDist := httptest.NewRecorder()
+	h.ServeHTTP(wDist, reqDist)
+	if wDist.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK from /api/v1/distribution/device/check-updates, got %d: %s", wDist.Code, wDist.Body.String())
+	}
+
+	// 4. Developer protected route returns 401 Unauthorized without auth
+	wDev := httptest.NewRecorder()
+	h.ServeHTTP(wDev, httptest.NewRequest(http.MethodPost, "/api/v1/developer/orgs", strings.NewReader(`{"slug":"test-org","name":"Test Org"}`)))
+	if wDev.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 Unauthorized from unauthenticated /api/v1/developer/orgs, got %d: %s", wDev.Code, wDev.Body.String())
 	}
 }

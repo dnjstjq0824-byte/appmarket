@@ -17,20 +17,20 @@ import (
 )
 
 var (
-	ErrDownloadTokenExpired                = errors.New("ERR_DOWNLOAD_TOKEN_EXPIRED")
-	ErrDownloadTokenInvalidSignature       = errors.New("ERR_DOWNLOAD_TOKEN_INVALID_SIGNATURE")
-	ErrDownloadTokenRevoked                = errors.New("ERR_DOWNLOAD_TOKEN_REVOKED_BY_KILL_SWITCH")
-	ErrExternalLinkOnlyDownloadForbidden   = errors.New("ERR_EXTERNAL_LINK_ONLY_CANNOT_GENERATE_TOKEN")
-	ErrCountryGeoBlocked                   = errors.New("ERR_COUNTRY_GEO_BLOCKED")
-	ErrReleaseNotPublished                 = errors.New("ERR_RELEASE_NOT_PUBLISHED")
+	ErrDownloadTokenExpired              = errors.New("ERR_DOWNLOAD_TOKEN_EXPIRED")
+	ErrDownloadTokenInvalidSignature     = errors.New("ERR_DOWNLOAD_TOKEN_INVALID_SIGNATURE")
+	ErrDownloadTokenRevoked              = errors.New("ERR_DOWNLOAD_TOKEN_REVOKED_BY_KILL_SWITCH")
+	ErrExternalLinkOnlyDownloadForbidden = errors.New("ERR_EXTERNAL_LINK_ONLY_CANNOT_GENERATE_TOKEN")
+	ErrCountryGeoBlocked                 = errors.New("ERR_COUNTRY_GEO_BLOCKED")
+	ErrReleaseNotPublished               = errors.New("ERR_RELEASE_NOT_PUBLISHED")
 )
 
 type DownloadTokenService struct {
-	hmacSecret        []byte
-	cdnDomain         string
-	tokenTTL          time.Duration
-	revokedReleases   map[string]bool
-	mu                sync.RWMutex
+	hmacSecret      []byte
+	cdnDomain       string
+	tokenTTL        time.Duration
+	revokedReleases map[string]bool
+	mu              sync.RWMutex
 }
 
 func NewDownloadTokenService(secretKey string, cdnDomain string, tokenTTL time.Duration) *DownloadTokenService {
@@ -46,14 +46,14 @@ func NewDownloadTokenService(secretKey string, cdnDomain string, tokenTTL time.D
 }
 
 type TokenRequest struct {
-	AppID           string
-	ReleaseID       string
-	SHA256Checksum  string
-	DeviceOrUserID  string
-	CountryCode     string
+	AppID            string
+	ReleaseID        string
+	SHA256Checksum   string
+	DeviceOrUserID   string
+	CountryCode      string
 	BlockedCountries []string
-	RightsLevel     string // e.g. "TIER_1_DIRECT_MIRROR", "TIER_5_EXTERNAL_LINK_ONLY"
-	ReleaseStatus   domain.ReleaseStatus
+	RightsLevel      string // e.g. "TIER_1_DIRECT_MIRROR", "TIER_5_EXTERNAL_LINK_ONLY"
+	ReleaseStatus    domain.ReleaseStatus
 }
 
 type SignedDownloadURL struct {

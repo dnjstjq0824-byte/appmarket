@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -21,6 +22,23 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/trace"
 
+	catalogApp "github.com/bookingnetwork/appmarket/backend/internal/modules/catalog/application"
+	catalogInfra "github.com/bookingnetwork/appmarket/backend/internal/modules/catalog/infrastructure"
+	catalogPres "github.com/bookingnetwork/appmarket/backend/internal/modules/catalog/presentation"
+
+	developerApp "github.com/bookingnetwork/appmarket/backend/internal/modules/developer/application"
+	developerInfra "github.com/bookingnetwork/appmarket/backend/internal/modules/developer/infrastructure"
+	developerPres "github.com/bookingnetwork/appmarket/backend/internal/modules/developer/presentation"
+
+	distributionApp "github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/application"
+	distributionInfra "github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/infrastructure"
+	distributionPres "github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/presentation"
+
+	iamApp "github.com/bookingnetwork/appmarket/backend/internal/modules/iam/application"
+	iamInfra "github.com/bookingnetwork/appmarket/backend/internal/modules/iam/infrastructure"
+	iamPres "github.com/bookingnetwork/appmarket/backend/internal/modules/iam/presentation"
+	iamRbac "github.com/bookingnetwork/appmarket/backend/internal/modules/iam/rbac"
+
 	problem "github.com/bookingnetwork/appmarket/backend/internal/platform/errors"
 )
 
@@ -35,13 +53,18 @@ type Config struct {
 	TrustedProxyCIDRs []string
 	Logger            *slog.Logger
 	HTTPClient        *http.Client
+	DisableRateLimit  bool
 }
 
 type Server struct {
-	cfg            Config
-	trustedProxies []netip.Prefix
-	requestsTotal  atomic.Uint64
-	requests5xx    atomic.Uint64
+	cfg                 Config
+	trustedProxies      []netip.Prefix
+	requestsTotal       atomic.Uint64
+	requests5xx         atomic.Uint64
+	catalogHandler      *catalogPres.CatalogHandler
+	developerHandler    *developerPres.DeveloperHandler
+	distributionHandler *distributionPres.DistributionHandler
+	authHandler         *iamPres.AuthHandler
 }
 
 func New(cfg Config) (*Server, error) {
@@ -59,6 +82,72 @@ func New(cfg Config) (*Server, error) {
 		}
 		s.trustedProxies = append(s.trustedProxies, prefix.Masked())
 	}
+
+	// 1. Catalog domain wiring
+	var catalogRepo catalogApp.CatalogRepository
+	if cfg.DB != nil {
+		catalogRepo = catalogInfra.NewPostgresCatalogRepository(cfg.DB)
+	} else {
+		catalogRepo = catalogInfra.NewInMemoryCatalogRepository()
+	}
+	var catalogCache catalogApp.Cache
+	if cfg.Redis != nil {
+		catalogCache = catalogInfra.NewRedisCache(cfg.Redis)
+	} else {
+		catalogCache = catalogInfra.NewInMemoryCache()
+	}
+	catalogSvc := catalogApp.NewCatalogService(catalogRepo, catalogCache)
+	s.catalogHandler = catalogPres.NewCatalogHandler(catalogSvc)
+
+	// 2. IAM / Auth domain wiring
+	userRepo := iamInfra.NewPostgresUserRepository(cfg.DB)
+	sessionRepo := iamInfra.NewPostgresSessionRepository(cfg.DB)
+	mfaRepo := iamInfra.NewPostgresMFARepository(cfg.DB)
+	hasher := iamApp.NewPasswordHasher()
+	jwtManager, err := iamApp.NewJWTManager(nil, "https://auth.appmarket.local")
+	if err != nil {
+		return nil, fmt.Errorf("jwt manager initialization failed: %w", err)
+	}
+	mfaService := iamApp.NewMFAService("BN AppMarket")
+	dualApprovalRepo := iamRbac.NewInMemoryDualApprovalRepo()
+	dualControl := iamRbac.NewDualControlEngine(dualApprovalRepo)
+	matrixEnforcer := iamRbac.NewMatrixEnforcer(jwtManager)
+	authCfg := iamApp.AuthServiceConfig{
+		HMACSecret:      "appmarket-iam-blind-index-hmac-salt",
+		MaxFailedLogin:  5,
+		LockoutDuration: 15 * time.Minute,
+	}
+	authSvc := iamApp.NewAuthService(userRepo, sessionRepo, mfaRepo, hasher, jwtManager, mfaService, authCfg)
+	s.authHandler = iamPres.NewAuthHandler(authSvc, jwtManager, dualControl, matrixEnforcer, "https://auth.appmarket.local")
+
+	// 3. Developer domain wiring
+	devRepo := developerInfra.NewPostgresDeveloperRepository(cfg.DB)
+	orgSvc := developerApp.NewOrgService(devRepo)
+	memberSvc := developerApp.NewMemberService(devRepo)
+	apiKeySvc := developerApp.NewAPIKeyService(devRepo)
+	identityResolver := func(req *http.Request) (string, error) {
+		if claims, ok := iamRbac.GetClaims(req.Context()); ok && claims != nil {
+			return claims.UserID, nil
+		}
+		authHeader := req.Header.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+			claims, err := jwtManager.ValidateAccessToken(tokenStr)
+			if err == nil && claims != nil {
+				return claims.UserID, nil
+			}
+		}
+		return "", errors.New("unauthorized")
+	}
+	s.developerHandler = developerPres.NewDeveloperHandler(orgSvc, memberSvc, apiKeySvc, identityResolver)
+
+	// 4. Distribution domain wiring
+	tokenSecret := "appmarket-distribution-hmac-secret-v1"
+	cdnDomain := "cdn.appmarket.local"
+	tokenSvc := distributionApp.NewDownloadTokenService(tokenSecret, cdnDomain, 15*time.Minute)
+	candidateProvider := distributionInfra.NewPostgresCandidateProvider(cfg.DB)
+	s.distributionHandler = distributionPres.NewDistributionHandler(tokenSvc, candidateProvider)
+
 	return s, nil
 }
 
@@ -69,6 +158,20 @@ func (s *Server) Handler() http.Handler {
 	r.Get("/healthz/ready", s.readiness)
 	r.Get("/metrics", s.metrics)
 	r.Get("/api/v1/system/capabilities", s.capabilities)
+
+	if s.catalogHandler != nil {
+		r.Mount("/api/v1/catalog", s.catalogHandler.Routes())
+	}
+	if s.developerHandler != nil {
+		r.Mount("/api/v1/developer", s.developerHandler.Routes())
+	}
+	if s.distributionHandler != nil {
+		r.Mount("/api/v1/distribution", s.distributionHandler.Routes())
+	}
+	if s.authHandler != nil {
+		r.Mount("/api/v1/auth", s.authHandler.Routes())
+	}
+
 	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
 		problem.Write(w, http.StatusNotFound, "ERR_NOT_FOUND", "Route not found", "The requested endpoint does not exist.", traceID(req))
 	})
@@ -198,7 +301,7 @@ return count + 1`
 
 func (s *Server) rateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/api/") {
+		if s.cfg.DisableRateLimit || !strings.HasPrefix(r.URL.Path, "/api/") {
 			next.ServeHTTP(w, r)
 			return
 		}
