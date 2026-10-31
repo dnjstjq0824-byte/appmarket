@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bn-appmarket
+  labels:
+    app.kubernetes.io/name: bn-appmarket
+    app.kubernetes.io/part-of: bookingnetwork-platform
+    environment: production

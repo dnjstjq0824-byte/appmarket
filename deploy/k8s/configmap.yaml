@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bn-appmarket-config
+  namespace: bn-appmarket
+data:
+  ALLOWED_ORIGIN: "https://appmarket.dnjstjqppk.workers.dev"
+  TRUSTED_PROXY_CIDRS: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4318"
+  S3_HEALTH_URL: "http://minio.bn-appmarket.svc.cluster.local:9000/minio/health/ready"
+  OPENSEARCH_URL: "http://opensearch.bn-appmarket.svc.cluster.local:9200"
+  RATE_LIMIT_RPS: "5000"
+  TREESCAN_MODE: "STANDALONE_ISOLATED"

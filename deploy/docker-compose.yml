@@ -5,7 +5,7 @@ services:
     image: postgres:16.6-alpine
     environment:
       POSTGRES_USER: bn_app
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bn_secure_password_2026}
       POSTGRES_DB: bn_appmarket
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -19,15 +19,15 @@ services:
 
   redis:
     image: redis:7.4.1-alpine
-    command: ['sh', '-c', 'exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD}"']
+    command: ['sh', '-c', 'exec redis-server --appendonly yes --requirepass "$${REDIS_PASSWORD:-bn_redis_auth_2026}"']
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-bn_redis_auth_2026}
     volumes:
       - redisdata:/data
     ports:
       - '127.0.0.1:6379:6379'
     healthcheck:
-      test: ['CMD-SHELL', 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep PONG']
+      test: ['CMD-SHELL', 'redis-cli -a "$${REDIS_PASSWORD:-bn_redis_auth_2026}" ping | grep PONG']
       interval: 5s
       retries: 12
     networks: [data]
@@ -52,8 +52,8 @@ services:
     image: quay.io/minio/minio:RELEASE.2024-10-29T16-01-48Z
     command: ['server', '/data', '--console-address', ':9001']
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-bn_minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-bn_minio_password_2026}
     volumes:
       - miniodata:/data
     ports:
@@ -69,7 +69,7 @@ services:
     image: minio/mc:RELEASE.2024-10-29T15-34-59Z
     entrypoint: ['/bin/sh', '-ec']
     command: >-
-      mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}";
+      mc alias set local http://minio:9000 "$${MINIO_ROOT_USER:-bn_minio_admin}" "$${MINIO_ROOT_PASSWORD:-bn_minio_password_2026}";
       mc mb --ignore-existing local/bn-quarantine-bucket;
       mc mb --ignore-existing local/bn-public-cdn-bucket;
       mc mb --ignore-existing local/bn-kyb-vault-bucket;
@@ -77,10 +77,22 @@ services:
       mc anonymous set none local/bn-public-cdn-bucket;
       mc anonymous set none local/bn-kyb-vault-bucket
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-bn_minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-bn_minio_password_2026}
     depends_on:
       minio: {condition: service_healthy}
+    networks: [data]
+
+  migrator:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    entrypoint: ['/bin/sh', '-ec', '/usr/local/bin/migrate && /usr/local/bin/seed']
+    environment:
+      DATABASE_URL: postgres://bn_app:${POSTGRES_PASSWORD:-bn_secure_password_2026}@postgres:5432/bn_appmarket?sslmode=disable
+      MIGRATIONS_DIR: /app/db/migrations
+    depends_on:
+      postgres: {condition: service_healthy}
     networks: [data]
 
   api:
@@ -88,18 +100,19 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile.backend
     environment:
-      DATABASE_URL: postgres://bn_app:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/bn_appmarket?sslmode=disable
-      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD}@redis:6379/0
+      DATABASE_URL: postgres://bn_app:${POSTGRES_PASSWORD:-bn_secure_password_2026}@postgres:5432/bn_appmarket?sslmode=disable
+      REDIS_URL: redis://:${REDIS_PASSWORD:-bn_redis_auth_2026}@redis:6379/0
       OPENSEARCH_URL: http://opensearch:9200
       S3_HEALTH_URL: http://minio:9000/minio/health/ready
-      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-http://localhost:3000}
-      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-}
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-https://appmarket.dnjstjqppk.workers.dev}
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
       opensearch: {condition: service_healthy}
       minio: {condition: service_healthy}
+      migrator: {condition: service_completed_successfully}
     ports:
       - '127.0.0.1:8080:8080'
     read_only: true
@@ -128,8 +141,8 @@ services:
   grafana:
     image: grafana/grafana:11.3.0
     environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?set GRAFANA_ADMIN_USER}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-GrafanaAdminSecure2026!}
     ports:
       - '127.0.0.1:3001:3000'
     networks: [data]
@@ -144,4 +157,3 @@ volumes:
   redisdata:
   searchdata:
   miniodata:
-

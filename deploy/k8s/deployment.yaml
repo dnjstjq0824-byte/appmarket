@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bn-appmarket-api
+  namespace: bn-appmarket
+  labels:
+    app.kubernetes.io/name: bn-appmarket-api
+    app.kubernetes.io/component: backend-api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bn-appmarket-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bn-appmarket-api
+        app.kubernetes.io/component: backend-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      initContainers:
+        - name: schema-migrator
+          image: ghcr.io/bookingnetwork/appmarket-api:latest
+          command: ["/usr/local/bin/migrate"]
+          envFrom:
+            - configMapRef:
+                name: bn-appmarket-config
+            - secretRef:
+                name: bn-appmarket-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      containers:
+        - name: api
+          image: ghcr.io/bookingnetwork/appmarket-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: bn-appmarket-config
+            - secretRef:
+                name: bn-appmarket-secrets
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /healthz/live
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
