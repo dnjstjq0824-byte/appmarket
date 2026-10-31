@@ -86,7 +86,9 @@
         </div>
         <div class="bank-item">
           <label>KYB Verification</label>
-          <div class="value text-success font-bold">✓ Verified</div>
+          <div class="value font-bold" :class="kybStatus === 'VERIFIED' ? 'text-success' : 'text-amber-400'">
+            {{ kybStatus === 'VERIFIED' ? '✓ Verified' : '⚠️ Unverified (KYB Required)' }}
+          </div>
         </div>
       </div>
     </div>
@@ -94,7 +96,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+
+const kybStatus = ref('UNVERIFIED');
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('bn_kyb_status');
+    if (saved) kybStatus.value = saved;
+  }
+});
 
 const financialSummary = ref({
   availableBalance: 42500000,

@@ -3,9 +3,16 @@ package application
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
+)
+
+var (
+	ErrVTKeyMissing      = errors.New("ERR_VT_KEY_MISSING: VirusTotal API key is not configured. Fail-Closed quarantine enforced.")
+	ErrVTScanFailed      = errors.New("ERR_VT_SCAN_FAILED: VirusTotal analysis query returned failure")
+	ErrVTThreatDetected  = errors.New("ERR_VT_THREAT_DETECTED: VirusTotal detected malicious engines")
 )
 
 // VirusTotalScanResult encapsulates the v3 analysis statistics
@@ -35,8 +42,13 @@ func NewVirusTotalClient(apiKey string) *VirusTotalClient {
 
 // QueryFileReport checks whether the SHA-256 hash has been analyzed by VirusTotal 70+ engines
 func (c *VirusTotalClient) QueryFileReport(ctx context.Context, sha256Hash string) (*VirusTotalScanResult, error) {
-	if c.apiKey == "" || c.apiKey == "test_vt_key" {
-		// Sandbox clean simulation
+	// Security Fail-Closed: Unconfigured API key MUST NOT pass clean
+	if c.apiKey == "" {
+		return nil, ErrVTKeyMissing
+	}
+
+	if c.apiKey == "test_sandbox_hermetic_clean" {
+		// Hermetic testing sandbox fixture ONLY
 		return &VirusTotalScanResult{
 			SHA256:        sha256Hash,
 			Malicious:     0,

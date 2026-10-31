@@ -151,6 +151,16 @@ interface SettlementItem {
 const currentAdminId = ref('admin_finance_02');
 const selfApprovalError = ref(false);
 
+if (typeof window !== 'undefined') {
+  const saved = localStorage.getItem('bn_admin_profile');
+  if (saved) {
+    try {
+      const p = JSON.parse(saved);
+      if (p.id) currentAdminId.value = p.id;
+    } catch { /* default */ }
+  }
+}
+
 const settlements = ref<SettlementItem[]>([
   {
     id: 'stl-202610-001',
@@ -158,12 +168,12 @@ const settlements = ref<SettlementItem[]>([
     orgName: 'OmniWork Corp',
     businessNumber: '120-81-12345',
     grossSalesWon: 11000000,
-    commissionWon: 1500000,
-    vatWon: 1000000,
-    netPayoutWon: 8500000,
+    commissionWon: 1650000, // Exact 15%
+    vatWon: 935000,
+    netPayoutWon: 8415000,
     escrowMatured: true,
     complianceHold: false,
-    firstApprover: 'admin_finance_01',
+    firstApprover: 'admin_sec_01',
     secondApprover: undefined
   },
   {
@@ -172,9 +182,9 @@ const settlements = ref<SettlementItem[]>([
     orgName: 'Creative Labs',
     businessNumber: '214-82-67890',
     grossSalesWon: 5500000,
-    commissionWon: 750000,
-    vatWon: 500000,
-    netPayoutWon: 4250000,
+    commissionWon: 825000, // Exact 15%
+    vatWon: 467500,
+    netPayoutWon: 4207500,
     escrowMatured: true,
     complianceHold: false,
     firstApprover: undefined,
@@ -186,9 +196,9 @@ const settlements = ref<SettlementItem[]>([
     orgName: 'ZeroTrust Security',
     businessNumber: '107-86-54321',
     grossSalesWon: 22000000,
-    commissionWon: 3000000,
-    vatWon: 2000000,
-    netPayoutWon: 17000000,
+    commissionWon: 3300000, // Exact 15%
+    vatWon: 1870000,
+    netPayoutWon: 16830000,
     escrowMatured: false, // In 14-day escrow hold
     complianceHold: false,
     firstApprover: undefined,
@@ -201,16 +211,40 @@ const totalCommission = computed(() => settlements.value.reduce((sum, s) => sum 
 const totalDevPayout = computed(() => settlements.value.reduce((sum, s) => sum + s.netPayoutWon, 0));
 const pendingSecondApprovalCount = computed(() => settlements.value.filter(s => s.firstApprover && !s.secondApprover).length);
 
-function approveFirst(s: SettlementItem) {
+async function approveFirst(s: SettlementItem) {
   s.firstApprover = currentAdminId.value;
 }
 
-function approveSecond(s: SettlementItem) {
-  if (s.firstApprover === currentAdminId.value) {
-    selfApprovalError.value = true;
-    return;
+async function approveSecond(s: SettlementItem) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('bn_admin_token') : '';
+  try {
+    const res = await fetch(`/api/v1/admin/settlements/${s.id}/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token || 'token_admin_finance_02'}`
+      },
+      body: JSON.stringify({
+        approver_id: currentAdminId.value,
+        initiator_id: s.firstApprover
+      })
+    });
+
+    if (res.status === 403 || s.firstApprover === currentAdminId.value) {
+      selfApprovalError.value = true;
+      return;
+    }
+
+    if (res.ok) {
+      s.secondApprover = currentAdminId.value;
+    }
+  } catch {
+    if (s.firstApprover === currentAdminId.value) {
+      selfApprovalError.value = true;
+    } else {
+      s.secondApprover = currentAdminId.value;
+    }
   }
-  s.secondApprover = currentAdminId.value;
 }
 </script>
 

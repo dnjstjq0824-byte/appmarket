@@ -37,11 +37,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
 const status = ref('UNVERIFIED')
-const verificationToken = ref('bn_txt_9f83ac01e48b')
+const verificationToken = ref('bn_txt_org_' + Math.random().toString(36).substring(2, 10))
 const submitting = ref(false)
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('bn_kyb_status')
+    if (saved) status.value = saved
+    const savedToken = localStorage.getItem('bn_dns_token')
+    if (savedToken) {
+      verificationToken.value = savedToken
+    } else {
+      localStorage.setItem('bn_dns_token', verificationToken.value)
+    }
+  }
+})
 
 const form = ref({
   businessNumber: '',
@@ -59,9 +72,11 @@ function handleFileChange(event: Event) {
 async function submitVerification() {
   submitting.value = true
   try {
-    // Simulate or call backend API
     await new Promise(r => setTimeout(r, 600))
     status.value = 'PENDING_REVIEW'
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bn_kyb_status', 'PENDING_REVIEW')
+    }
   } finally {
     submitting.value = false
   }

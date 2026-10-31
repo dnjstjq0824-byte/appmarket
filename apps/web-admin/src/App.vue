@@ -23,15 +23,57 @@
       <div class="bn-topbar-actions">
         <a href="/" class="bn-nav-link-btn" title="사용자 마켓으로 이동">🛒 User Store</a>
         <a href="/developer/" class="bn-nav-link-btn" title="개발자 콘솔로 이동">💻 Dev Portal</a>
-        <div class="bn-admin-user">
-          <div class="bn-avatar">SA</div>
+        
+        <div v-if="isAuthenticated && currentAdmin" class="bn-admin-user">
+          <div class="bn-avatar">{{ currentAdmin.avatar }}</div>
           <div class="bn-user-info">
-            <span class="bn-user-name">Super Admin</span>
-            <span class="bn-user-role">Security Officer</span>
+            <span class="bn-user-name">{{ currentAdmin.name }}</span>
+            <span class="bn-user-role">{{ currentAdmin.roleName }} ({{ currentAdmin.id }})</span>
           </div>
+          <button @click="logoutAdmin" class="bn-logout-btn" title="관리자 세션 로그아웃">로그아웃</button>
+        </div>
+        <div v-else class="bn-admin-user">
+          <button @click="showAuthModal = true" class="bn-login-btn">🔐 관리자 인증</button>
         </div>
       </div>
     </header>
+
+    <!-- Authentication Gate Modal when not authenticated -->
+    <div v-if="!isAuthenticated && showAuthModal" class="bn-auth-gate-overlay">
+      <div class="bn-auth-card">
+        <div class="bn-auth-header">
+          <span class="bn-auth-shield">🛡️</span>
+          <h3>BookingNetwork 관리자 보안 인증</h3>
+          <p>관리자 콘솔 접근을 위해 승인된 직무 역할로 인증해야 합니다. (Zero-Trust IAM Enforcement)</p>
+        </div>
+
+        <div class="bn-role-options">
+          <div 
+            v-for="role in availableRoles" 
+            :key="role.id" 
+            class="bn-role-card" 
+            :class="{ active: selectedRole?.id === role.id }"
+            @click="selectedRole = role"
+          >
+            <div class="bn-role-card-header">
+              <strong>{{ role.name }}</strong>
+              <span class="bn-role-badge">{{ role.id }}</span>
+            </div>
+            <p>{{ role.description }}</p>
+          </div>
+        </div>
+
+        <div class="bn-auth-actions">
+          <button 
+            class="bn-btn-primary" 
+            :disabled="!selectedRole"
+            @click="authenticateAs(selectedRole!)"
+          >
+            선택한 직무로 관리자 세션 시작
+          </button>
+        </div>
+      </div>
+    </div>
 
     <div class="bn-admin-body">
       <!-- Left Navigation Sidebar -->
@@ -115,7 +157,75 @@
 </template>
 
 <script setup lang="ts">
-// Admin global layout
+import { ref, onMounted } from 'vue';
+
+interface AdminRole {
+  id: string;
+  name: string;
+  roleName: string;
+  avatar: string;
+  description: string;
+}
+
+const availableRoles: AdminRole[] = [
+  {
+    id: 'admin_sec_01',
+    name: 'Security Lead (SA)',
+    roleName: 'Security Officer & Super Admin',
+    avatar: 'SA',
+    description: '전체 클러스터 보안 검역, 악성 APK 바이너리 영구 차단(Kill-Switch) 및 1차 승인 권한'
+  },
+  {
+    id: 'admin_finance_02',
+    name: 'Finance Auditor 02',
+    roleName: 'Settlement & Finance Auditor',
+    avatar: 'FA',
+    description: '대규모 개발자 정산 및 환불 2차 최종 지급 승인 권한 (Four-Eyes Principle 준수)'
+  }
+];
+
+const selectedRole = ref<AdminRole | null>(availableRoles[0]);
+const isAuthenticated = ref(false);
+const showAuthModal = ref(false);
+const currentAdmin = ref<AdminRole | null>(null);
+
+function authenticateAs(role: AdminRole) {
+  currentAdmin.value = role;
+  isAuthenticated.value = true;
+  showAuthModal.value = false;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('bn_admin_token', `token_${role.id}_${Date.now()}`);
+    localStorage.setItem('bn_admin_profile', JSON.stringify(role));
+  }
+}
+
+function logoutAdmin() {
+  isAuthenticated.value = false;
+  currentAdmin.value = null;
+  showAuthModal.value = true;
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('bn_admin_token');
+    localStorage.removeItem('bn_admin_profile');
+  }
+}
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    const savedToken = localStorage.getItem('bn_admin_token');
+    const savedProfile = localStorage.getItem('bn_admin_profile');
+    if (savedToken && savedProfile) {
+      try {
+        currentAdmin.value = JSON.parse(savedProfile);
+        isAuthenticated.value = true;
+      } catch {
+        showAuthModal.value = true;
+      }
+    } else {
+      // Prompt auth
+      showAuthModal.value = true;
+    }
+  }
+});
 </script>
 
 <style>
@@ -374,5 +484,155 @@ body {
   background-color: #0b1120;
   overflow-y: auto;
   min-height: calc(100vh - 64px);
+}
+
+/* Auth Gate Modal Styles */
+.bn-logout-btn {
+  background: transparent;
+  border: 1px solid #475569;
+  color: #94a3b8;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: all 0.15s;
+}
+.bn-logout-btn:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+.bn-login-btn {
+  background: #1d4ed8;
+  border: none;
+  color: #ffffff;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bn-auth-gate-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 17, 32, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.bn-auth-card {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  max-width: 580px;
+  width: 100%;
+  padding: 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+}
+
+.bn-auth-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.bn-auth-shield {
+  font-size: 40px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.bn-auth-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #f8fafc;
+  margin-bottom: 8px;
+}
+
+.bn-auth-header p {
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.bn-role-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.bn-role-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bn-role-card:hover {
+  border-color: #60a5fa;
+  background: #24344d;
+}
+
+.bn-role-card.active {
+  border-color: #38bdf8;
+  background: #172554;
+  box-shadow: 0 0 0 1px #38bdf8;
+}
+
+.bn-role-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.bn-role-card-header strong {
+  font-size: 14px;
+  color: #f1f5f9;
+}
+
+.bn-role-badge {
+  font-size: 11px;
+  font-family: monospace;
+  background: #0f172a;
+  color: #38bdf8;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.bn-role-card p {
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+.bn-auth-actions .bn-btn-primary {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.bn-auth-actions .bn-btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.bn-auth-actions .bn-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

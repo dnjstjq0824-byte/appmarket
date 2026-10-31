@@ -5,13 +5,19 @@
       <p class="subtitle">Secure multipart upload, client-side SHA-256 integrity verification, and binary validation</p>
     </div>
 
+    <!-- KYB Gate Alert if not verified -->
+    <div v-if="kybStatus !== 'VERIFIED'" class="kyb-gate-banner" style="background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #fbbf24; font-size: 13px;">
+      <strong>⚠️ 조직 KYB 미검증 상태 (업로드 제한)</strong>
+      <p style="margin-top: 4px; color: #d1d5db;">보안 규정에 따라 법인 신원 검증(KYB)이 완료되지 않은 조직은 릴리스 바이너리를 업로드할 수 없습니다. <router-link to="/" style="color: #60a5fa; text-decoration: underline;">[조직 & KYB 인증]</router-link> 페이지에서 서류를 제출해 주십시오.</p>
+    </div>
+
     <!-- Drop Zone -->
     <div 
       class="upload-dropzone" 
-      :class="{ 'dragging': isDragging, 'has-file': !!selectedFile }"
-      @dragover.prevent="isDragging = true"
+      :class="{ 'dragging': isDragging, 'has-file': !!selectedFile, 'disabled-zone': kybStatus !== 'VERIFIED' }"
+      @dragover.prevent="kybStatus === 'VERIFIED' && (isDragging = true)"
       @dragleave.prevent="isDragging = false"
-      @drop.prevent="handleFileDrop"
+      @drop.prevent="kybStatus === 'VERIFIED' && handleFileDrop($event)"
     >
       <input 
         type="file" 
@@ -19,7 +25,7 @@
         accept=".apk,.aab" 
         @change="handleFileInput" 
         class="hidden-file-input"
-        :disabled="uploadState === 'UPLOADING' || uploadState === 'HASHING'"
+        :disabled="uploadState === 'UPLOADING' || uploadState === 'HASHING' || kybStatus !== 'VERIFIED'"
       />
       <label for="fileInput" class="dropzone-label">
         <div class="drop-icon">📦</div>
@@ -121,9 +127,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 
 type UploadState = 'IDLE' | 'HASHING' | 'UPLOADING' | 'COMPLETED' | 'ERROR';
+
+const kybStatus = ref('UNVERIFIED');
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('bn_kyb_status');
+    if (saved) kybStatus.value = saved;
+  }
+});
 
 const isDragging = ref(false);
 const selectedFile = ref<File | null>(null);

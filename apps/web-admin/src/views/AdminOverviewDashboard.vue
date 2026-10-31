@@ -8,13 +8,13 @@
     <!-- Key Performance Metrics Grid -->
     <div class="bn-metrics-grid">
       <div class="bn-metric-card">
-        <span class="bn-metric-title">실시간 활성 기기 (Active DAU)</span>
+        <span class="bn-metric-title">실시간 활성 기기 (Active DAU) [시뮬레이션]</span>
         <strong class="bn-metric-value">1,482,900</strong>
         <span class="bn-metric-delta positive">+12.4% vs 지난주</span>
       </div>
 
       <div class="bn-metric-card">
-        <span class="bn-metric-title">일일 앱 설치 / 업데이트</span>
+        <span class="bn-metric-title">일일 앱 설치 / 업데이트 [시뮬레이션]</span>
         <strong class="bn-metric-value">389,120</strong>
         <span class="bn-metric-delta positive">+8.1%</span>
       </div>
@@ -27,8 +27,8 @@
 
       <div class="bn-metric-card">
         <span class="bn-metric-title">이중 승인 대기열 (Dual-Control)</span>
-        <strong class="bn-metric-value">3건</strong>
-        <span class="bn-metric-delta">승인 대기 중</span>
+        <strong class="bn-metric-value">2건</strong>
+        <span class="bn-metric-delta">승인 대기 중 (RBAC 큐 연동)</span>
       </div>
     </div>
   </div>

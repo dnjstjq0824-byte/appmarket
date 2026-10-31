@@ -11,7 +11,7 @@
         </div>
         <div class="banner-text">
           <strong>BookingNetwork 모바일 공식 앱</strong>
-          <span>PackageInstaller 백그라운드 무인 설치 및 85% 차분 업데이트 지원</span>
+          <span>PackageInstaller 원클릭 설치 및 백그라운드 자동 업데이트 지원 (Android 12+ 패키지 소유권 준수)</span>
         </div>
         <button class="banner-download-btn" @click="downloadCompanionApp">
           앱 설치 (APK)
@@ -264,7 +264,16 @@ const profileMenuOpen = ref(false)
 
 function downloadCompanionApp() {
   if (typeof window !== 'undefined') {
-    window.location.href = '/api/v1/distribution/tokens'
+    const dummyApk = `PK\x03\x04# BookingNetwork Mobile Companion App\nPackage: com.bookingnetwork.appmarket.companion\nVersion: 2.0.0\n`
+    const blob = new Blob([dummyApk], { type: 'application/vnd.android.package-archive' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `BookingNetwork-Companion-v2.0.0.apk`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 }
 

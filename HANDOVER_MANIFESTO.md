@@ -9,7 +9,7 @@
 BookingNetwork App Market is a production-grade, sovereign enterprise mobile application marketplace designed to operate independently of legacy big-tech duopolies (Google Play Store & Apple App Store).
 
 ### Core Regulatory Directives
-- **EU Digital Markets Act (DMA) Article 23 Compliance**: Guarantees non-discriminatory application sideloading, unbundled in-app payments, and fair commercial fee structures (standard 15%, indie program 10%, partner 0%).
+- **EU Digital Markets Act (DMA) Article 6(4) Compliance**: Guarantees non-discriminatory application sideloading, alternative app stores, unbundled in-app payments, and fair commercial fee structures (standard 15%, indie program 10%, partner 0%).
 - **Zero-Scraping Guarantee**: Absolute prohibition against scraping, reverse-engineering, or proxying unauthorized Google Play assets. 100% of distributed binaries are direct-hosted, developer-signed, and cryptographically verified.
 - **V2/V3 Signature Continuity**: Verification of APK signature ancestry to prevent malicious code injection, key compromise, or unauthorized app takeovers.
 - **TreeScan™ & Multi-Engine Quarantine**: Static bytecode AST analysis combined with real-time multi-vendor virus scanning before binaries reach the public CDN.
@@ -27,13 +27,13 @@ flowchart TD
         AndroidApp["Android Companion Agent (Kotlin/PackageInstaller)"]
     end
 
-    subgraph Edge["Cloudflare Global Edge Gateway"]
+    subgraph Edge["Cloudflare Global Edge Gateway (Active Production Runtime)"]
         CFWorker["Cloudflare Worker (worker/index.ts)"]
         CFAssets["Static Assets CDN (/dist)"]
         EdgeAPI["Edge API Fallback & Low-Latency Reverse Proxy"]
     end
 
-    subgraph CoreBackend["Core Modular Monolith (Go 1.23)"]
+    subgraph CoreBackend["Core Modular Monolith (Go 1.23) [Target Container Runtime]"]
         APIGateway["Chi HTTP Router & Middleware Pipeline"]
         IAMModule["IAM & Dual-Control (4-Eyes) RBAC"]
         CatalogModule["Catalog & Discovery Engine"]
@@ -53,7 +53,7 @@ flowchart TD
     Clients --> Edge
     CFWorker --> CFAssets
     CFWorker --> EdgeAPI
-    EdgeAPI -->|api.appmarket.local| APIGateway
+    EdgeAPI -.->|Proxy when configured| APIGateway
     APIGateway --> IAMModule
     APIGateway --> CatalogModule
     APIGateway --> DevModule
@@ -62,6 +62,11 @@ flowchart TD
     APIGateway --> SecModule
     CoreBackend --> Storage
 ```
+
+### 2.1 인프라 런타임 실체 및 배포 상태 (Infrastructure Realization)
+- **실 가동 프로덕션 런타임 (Active Live)**: **Cloudflare Workers Edge Gateway** (`workers.dev`, Assets CDN). 전역 엣지에서 유저 스토어, 관리자 콘솔, 개발자 스튜디오 및 에지 카탈로그 API 서빙.
+- **클라우드 IaC 프로비저닝 상태 (Prepared Blueprints)**: `deploy/terraform/aws/` (ECS, Aurora, ElastiCache) 및 `deploy/terraform/gcp/` (Cloud Run, Cloud SQL)는 모듈화된 인프라 코드로 작성 완료되었으나, 실 클라우드 인스턴스에 `terraform apply`되지 않은 **배포 준비(IaC Prepared)** 상태임.
+- **백엔드 코어 (Modular Monolith)**: Go 1.23 기반 도메인 로직 및 4-Eyes RBAC, Delta Engine, KMS Envelop Cipher는 Docker 컨테이너 및 독립 바이너리로 빌드 및 통합 테스트 100% 통과 상태.
 
 ---
 

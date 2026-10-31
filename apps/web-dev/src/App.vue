@@ -11,8 +11,8 @@
 
         <div class="bn-org-selector">
           <span class="bn-org-icon">🏢</span>
-          <span class="bn-org-name">OmniWork Technologies</span>
-          <span class="bn-org-badge">VERIFIED KYB</span>
+          <span class="bn-org-name">{{ orgName }}</span>
+          <span class="bn-org-badge" :class="kybStatus.toLowerCase()">{{ kybStatus === 'VERIFIED' ? 'VERIFIED KYB' : 'UNVERIFIED KYB' }}</span>
         </div>
       </div>
 
@@ -22,8 +22,8 @@
         <div class="bn-dev-user">
           <div class="bn-avatar">DV</div>
           <div class="bn-user-info">
-            <span class="bn-user-name">Lead Developer</span>
-            <span class="bn-user-org">dev@omniwork.com</span>
+            <span class="bn-user-name">{{ devUser.name }}</span>
+            <span class="bn-user-org">{{ devUser.email }}</span>
           </div>
         </div>
       </div>
@@ -111,7 +111,32 @@
 </template>
 
 <script setup lang="ts">
-// Developer global layout
+import { ref, onMounted } from 'vue';
+
+const orgName = ref('OmniWork Technologies');
+const kybStatus = ref('UNVERIFIED');
+const devUser = ref({
+  name: 'Lead Developer',
+  email: 'dev@bookingnetwork.org'
+});
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    const savedKyb = localStorage.getItem('bn_kyb_status');
+    if (savedKyb) {
+      kybStatus.value = savedKyb;
+    }
+    const savedUser = localStorage.getItem('bn_dev_profile');
+    if (savedUser) {
+      try {
+        const u = JSON.parse(savedUser);
+        if (u.name) devUser.value.name = u.name;
+        if (u.email) devUser.value.email = u.email;
+        if (u.org) orgName.value = u.org;
+      } catch { /* default */ }
+    }
+  }
+});
 </script>
 
 <style>

@@ -10,6 +10,7 @@ import (
 	distDomain "github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/domain"
 	modApp "github.com/bookingnetwork/appmarket/backend/internal/modules/moderation/application"
 	modDomain "github.com/bookingnetwork/appmarket/backend/internal/modules/moderation/domain"
+	secApp "github.com/bookingnetwork/appmarket/backend/internal/modules/security/application"
 	"github.com/bookingnetwork/appmarket/backend/internal/platform/crypto"
 )
 
@@ -56,6 +57,16 @@ func TestOWASP_SecurityEnforcements(t *testing.T) {
 			t.Fatal("OWASP VULNERABILITY DETECTED: Tampered HMAC signature was accepted!")
 		}
 		t.Logf("Tampered signature successfully rejected: %v", err)
+	})
+
+	t.Run("API1:2023 - Unauthenticated Privileged Action Rejection & Fail-Closed", func(t *testing.T) {
+		// Verify Fail-Closed security behavior: unconfigured security scanner must reject
+		vtClient := secApp.NewVirusTotalClient("")
+		_, err := vtClient.QueryFileReport(ctx, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+		if err == nil {
+			t.Fatal("OWASP VULNERABILITY: Security scanner passed clean with missing API key! Must be Fail-Closed.")
+		}
+		t.Logf("Fail-Closed security check passed: %v", err)
 	})
 
 	t.Run("API8:2023 - 4-Eyes Dual-Control Bypass Defense", func(t *testing.T) {

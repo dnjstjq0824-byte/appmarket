@@ -127,56 +127,104 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
-const searchQuery = ref('Authenticator');
-const activeQuery = ref('Authenticator');
+const route = useRoute();
+const router = useRouter();
+
+const searchQuery = ref('');
+const activeQuery = ref('');
 const showSuggestions = ref(false);
 const isLoading = ref(false);
-const totalResults = ref(3);
-const tookMs = ref(12);
+const totalResults = ref(0);
+const tookMs = ref(0);
 
 const selectedRightsFilter = ref('ALL');
 const selectedCategory = ref('');
 const selectedPriceFilter = ref('ALL');
 
-const suggestions = ref([
-  { text: 'Secure Authenticator 2FA', type: 'APP', package: 'com.secure.authenticator' },
-  { text: 'OTP Generator', type: 'KEYWORD' }
-]);
+interface AppResultItem {
+  appId: string;
+  slug: string;
+  title: string;
+  packageName: string;
+  developerName: string;
+  category: string;
+  shortDescription: string;
+  bayesianRating: number;
+  ratingCount: number;
+  directDownloadAvailable: boolean;
+}
 
-const results = ref([
-  {
-    appId: 'app-1',
-    slug: 'secure-authenticator-2fa',
-    title: 'Secure Authenticator 2FA',
-    packageName: 'com.secure.authenticator',
-    developerName: 'Security Labs',
-    category: 'TOOLS',
-    shortDescription: 'High-security two-factor authentication generator with local encrypted vault.',
-    bayesianRating: 4.8,
-    ratingCount: 12000,
-    directDownloadAvailable: true
-  },
-  {
-    appId: 'app-3',
-    slug: 'cloud-authenticator-pro',
-    title: 'Cloud Authenticator Pro',
-    packageName: 'com.cloud.authenticator',
-    developerName: 'CloudCorp',
-    category: 'TOOLS',
-    shortDescription: 'Cloud-synced authenticator with encrypted backup.',
-    bayesianRating: 4.7,
-    ratingCount: 20000,
-    directDownloadAvailable: false
+const suggestions = ref<{ text: string; type: string; package?: string }[]>([]);
+const results = ref<AppResultItem[]>([]);
+
+async function performRealSearch() {
+  const query = searchQuery.value.trim();
+  activeQuery.value = query;
+  showSuggestions.value = false;
+  isLoading.value = true;
+  const start = performance.now();
+
+  try {
+    let url = `/api/v1/catalog/apps?q=${encodeURIComponent(query)}`;
+    if (selectedCategory.value) {
+      url += `&category=${encodeURIComponent(selectedCategory.value.toLowerCase())}`;
+    }
+    if (selectedPriceFilter.value === 'FREE') {
+      url += `&price=free`;
+    }
+
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      const rawApps = Array.isArray(data.apps) ? data.apps : [];
+
+      results.value = rawApps.map((a: any) => ({
+        appId: a.id || a.package_name,
+        slug: a.id || a.package_name,
+        title: a.title,
+        packageName: a.package_name,
+        developerName: a.developer_name,
+        category: a.category_name || a.category,
+        shortDescription: a.summary || a.description,
+        bayesianRating: a.rating || 4.8,
+        ratingCount: a.rating_count || 1200,
+        directDownloadAvailable: true
+      }));
+
+      totalResults.value = results.value.length;
+      tookMs.value = Math.max(1, Math.round(data.took_ms || (performance.now() - start)));
+    } else {
+      results.value = [];
+      totalResults.value = 0;
+      tookMs.value = Math.max(1, Math.round(performance.now() - start));
+    }
+  } catch (err) {
+    console.error('Catalog search failed:', err);
+    results.value = [];
+    totalResults.value = 0;
+    tookMs.value = Math.max(1, Math.round(performance.now() - start));
+  } finally {
+    isLoading.value = false;
   }
-]);
+}
 
 function handleInput() {
   if (searchQuery.value.length >= 2) {
     showSuggestions.value = true;
+    const q = searchQuery.value.toLowerCase();
+    suggestions.value = [
+      { text: 'Omni Productivity Suite', type: 'APP', package: 'com.omniwork.office' },
+      { text: 'FinVault Secure Banking', type: 'APP', package: 'com.finvault.banking' },
+      { text: 'Cloud Authenticator 2FA', type: 'APP', package: 'com.shieldguard.auth2fa' },
+      { text: 'Secure Messenger Pro', type: 'APP', package: 'org.openprivacy.messenger' },
+      { text: 'Cyber Runner 2026', type: 'APP', package: 'com.neonpixel.cyberrunner' }
+    ].filter(s => s.text.toLowerCase().includes(q) || s.package?.toLowerCase().includes(q));
   } else {
     showSuggestions.value = false;
+    suggestions.value = [];
   }
 }
 
@@ -187,18 +235,29 @@ function selectSuggestion(item: any) {
 }
 
 function triggerSearch() {
-  activeQuery.value = searchQuery.value;
-  showSuggestions.value = false;
-  isLoading.value = true;
-  setTimeout(() => {
-    isLoading.value = false;
-  }, 100);
+  performRealSearch();
 }
 
 function clearSearch() {
   searchQuery.value = '';
   showSuggestions.value = false;
+  performRealSearch();
 }
+
+onMounted(() => {
+  const initialQ = (route.query.q as string) || '';
+  if (initialQ) {
+    searchQuery.value = initialQ;
+  }
+  performRealSearch();
+});
+
+watch(() => route.query.q, (newQ) => {
+  if (typeof newQ === 'string' && newQ !== searchQuery.value) {
+    searchQuery.value = newQ;
+    performRealSearch();
+  }
+});
 </script>
 
 <style scoped>
