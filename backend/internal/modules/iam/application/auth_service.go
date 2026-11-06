@@ -87,12 +87,22 @@ type RegisterInput struct {
 }
 
 type AuthResult struct {
-	AccessToken  string       `json:"access_token,omitempty"`
-	RefreshToken string       `json:"refresh_token,omitempty"`
-	ExpiresIn    int64        `json:"expires_in,omitempty"`
-	TokenType    string       `json:"token_type,omitempty"`
-	MFARequired  bool         `json:"mfa_required"`
-	User         *domain.User `json:"user,omitempty"`
+	AccessToken            string       `json:"access_token,omitempty"`
+	RefreshToken           string       `json:"refresh_token,omitempty"`
+	ExpiresIn              int64        `json:"expires_in,omitempty"`
+	TokenType              string       `json:"token_type,omitempty"`
+	MFARequired            bool         `json:"mfa_required"`
+	MFAEnrollmentRequired  bool         `json:"mfa_enrollment_required"`
+	User                   *domain.User `json:"user,omitempty"`
+}
+
+// MFAEnrollment carries first-time TOTP provisioning material. The secret is
+// returned exactly once at enrollment; afterwards only verification happens.
+type MFAEnrollment struct {
+	UserID          string   `json:"user_id"`
+	Secret          string   `json:"secret"`
+	ProvisioningURI string   `json:"provisioning_uri"`
+	RecoveryCodes   []string `json:"recovery_codes"`
 }
 
 func (s *AuthService) Register(ctx context.Context, input RegisterInput) (*domain.User, error) {
@@ -188,12 +198,69 @@ func (s *AuthService) Login(ctx context.Context, email, password, ipAddress, use
 	isMFAEnforced := isMFAMandatoryForRoles(roles)
 	if (mfaCred != nil && mfaCred.IsVerified) || isMFAEnforced {
 		return &AuthResult{
-			MFARequired: true,
-			User:        user,
+			MFARequired:           true,
+			MFAEnrollmentRequired: mfaCred == nil || !mfaCred.IsVerified,
+			User:                  user,
 		}, nil
 	}
 
 	return s.createSessionTokens(ctx, user, roles, orgRoles, false, ipAddress, userAgent)
+}
+
+// EnrollMFA provisions a first-time TOTP credential. The caller must prove the
+// account password, and enrollment is refused once a verified credential exists.
+func (s *AuthService) EnrollMFA(ctx context.Context, email, password string) (*MFAEnrollment, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	email = strings.ToLower(strings.TrimSpace(email))
+	blindIndex := ComputeBlindIndex(email, s.cfg.HMACSecret)
+
+	user, err := s.userRepo.GetUserByEmailBlindIndex(ctx, blindIndex)
+	if err != nil || user == nil {
+		return nil, domain.ErrInvalidCredentials
+	}
+
+	match, err := s.hasher.VerifyPassword(password, user.PasswordHash)
+	if err != nil || !match {
+		return nil, domain.ErrInvalidCredentials
+	}
+
+	existing, _ := s.mfaRepo.GetMFACredential(ctx, user.ID)
+	if existing != nil && existing.IsVerified {
+		return nil, domain.ErrMFAAlreadyEnrolled
+	}
+
+	secret, provisioningURI, recoveryCodes, hashedCodes, err := s.mfaService.GenerateSecret(user.Email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate MFA secret: %w", err)
+	}
+
+	now := time.Now().UTC()
+	cred := &domain.MFACredential{
+		ID:                uuid.New().String(),
+		UserID:            user.ID,
+		Type:              "TOTP",
+		SecretEncrypted:   secret,
+		BackupCodesHashed: hashedCodes,
+		IsVerified:        false,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+	if existing != nil {
+		cred.ID = existing.ID
+		cred.CreatedAt = existing.CreatedAt
+	}
+	if err := s.mfaRepo.SaveMFACredential(ctx, cred); err != nil {
+		return nil, fmt.Errorf("failed to save MFA credential: %w", err)
+	}
+
+	return &MFAEnrollment{
+		UserID:          user.ID,
+		Secret:          secret,
+		ProvisioningURI: provisioningURI,
+		RecoveryCodes:   recoveryCodes,
+	}, nil
 }
 
 func (s *AuthService) CompleteLoginWithMFA(ctx context.Context, userID, mfaCode, ipAddress, userAgent string) (*AuthResult, error) {
@@ -207,13 +274,26 @@ func (s *AuthService) CompleteLoginWithMFA(ctx context.Context, userID, mfaCode,
 		return nil, domain.ErrMFARequired
 	}
 
-	valid, err := s.mfaService.ValidateMFA(mfaCred, mfaCode, time.Now().UTC())
-	if err != nil || !valid {
-		return nil, domain.ErrInvalidMFACode
-	}
+	// First-time enrollment confirmation: a correct TOTP code verifies the
+	// freshly provisioned credential and completes the login.
+	if !mfaCred.IsVerified {
+		if !s.mfaService.VerifyTOTP(mfaCred.SecretEncrypted, mfaCode, time.Now().UTC()) {
+			return nil, domain.ErrInvalidMFACode
+		}
+		mfaCred.IsVerified = true
+		mfaCred.UpdatedAt = time.Now().UTC()
+		if err := s.mfaRepo.SaveMFACredential(ctx, mfaCred); err != nil {
+			return nil, fmt.Errorf("failed to confirm MFA credential: %w", err)
+		}
+	} else {
+		valid, err := s.mfaService.ValidateMFA(mfaCred, mfaCode, time.Now().UTC())
+		if err != nil || !valid {
+			return nil, domain.ErrInvalidMFACode
+		}
 
-	// If a recovery code was consumed, save updated hashed codes
-	_ = s.mfaRepo.SaveMFACredential(ctx, mfaCred)
+		// If a recovery code was consumed, save updated hashed codes
+		_ = s.mfaRepo.SaveMFACredential(ctx, mfaCred)
+	}
 
 	roles, orgRoles, _ := s.userRepo.GetUserRoles(ctx, user.ID)
 	if len(roles) == 0 {

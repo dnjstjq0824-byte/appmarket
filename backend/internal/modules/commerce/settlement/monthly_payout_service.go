@@ -62,6 +62,22 @@ func (s *MonthlyPayoutService) CreatePayoutRequest(ctx context.Context, orgID st
 	return payout, nil
 }
 
+func (s *MonthlyPayoutService) GetPayout(payoutID string) *SettlementPayout {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.payouts[payoutID]
+}
+
+func (s *MonthlyPayoutService) ListPayouts() []SettlementPayout {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]SettlementPayout, 0, len(s.payouts))
+	for _, p := range s.payouts {
+		out = append(out, *p)
+	}
+	return out
+}
+
 // ApprovePayout enforces Dual-Control: Approver must be distinct from Creator
 func (s *MonthlyPayoutService) ApprovePayout(ctx context.Context, payoutID string, approverID string) (*SettlementPayout, error) {
 	s.mu.Lock()

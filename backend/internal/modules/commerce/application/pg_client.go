@@ -49,11 +49,15 @@ type PGSessionRequest struct {
 	FailURL     string
 }
 
-// PGSessionResult returned to mobile/web client
+// PGSessionResult returned to mobile/web client.
+// Toss fills CheckoutURL (redirect the buyer there). PortOne fills PaymentKey
+// plus ClientKey (complete the payment with the PortOne browser SDK using the
+// store id in ClientKey); CheckoutURL is empty for PortOne.
 type PGSessionResult struct {
 	Provider    PGProvider `json:"provider"`
 	PaymentKey  string     `json:"payment_key,omitempty"`
-	CheckoutURL string     `json:"checkout_url"`
+	ClientKey   string     `json:"client_key,omitempty"`
+	CheckoutURL string     `json:"checkout_url,omitempty"`
 	OrderID     string     `json:"order_id"`
 	AmountKRW   int64      `json:"amount_krw"`
 	ExpiresAt   time.Time  `json:"expires_at"`
@@ -133,6 +137,119 @@ func (c *TossPaymentsClient) ConfirmPayment(ctx context.Context, paymentKey, ord
 }
 
 func (c *TossPaymentsClient) VerifyWebhookSignature(payload []byte, signatureHeader string) bool {
+	if c.cfg.WebhookSecret == "" {
+		return true // Sandbox permissive
+	}
+	mac := hmac.New(sha256.New, []byte(c.cfg.WebhookSecret))
+	mac.Write(payload)
+	expectedSig := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(expectedSig), []byte(signatureHeader))
+}
+
+// PortOneV2Client implements PGClient for PortOne (ex-Iamport) V2 REST API.
+// Live mode authenticates with the API secret, verifies payments against the
+// PortOne ledger, and HMAC-verifies webhooks. Without credentials (or with
+// IsLive=false) every call succeeds idempotently in sandbox mode.
+type PortOneV2Client struct {
+	cfg PGConfig
+}
+
+func NewPortOneV2Client(cfg PGConfig) *PortOneV2Client {
+	if cfg.HTTPClient == nil {
+		cfg.HTTPClient = &http.Client{Timeout: 10 * time.Second}
+	}
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = "https://api.portone.io"
+	}
+	return &PortOneV2Client{cfg: cfg}
+}
+
+func (c *PortOneV2Client) sandbox() bool {
+	return !c.cfg.IsLive || c.cfg.SecretKey == ""
+}
+
+func (c *PortOneV2Client) CreateCheckoutSession(_ context.Context, req PGSessionRequest) (*PGSessionResult, error) {
+	if req.AmountKRW <= 0 {
+		return nil, ErrPGSessionFailed
+	}
+	return &PGSessionResult{
+		Provider:   PGProviderPortOne,
+		PaymentKey: fmt.Sprintf("pay-%s-%d", req.OrderID, time.Now().Unix()),
+		ClientKey:  c.cfg.ClientKey,
+		OrderID:    req.OrderID,
+		AmountKRW:  req.AmountKRW,
+		ExpiresAt:  time.Now().Add(30 * time.Minute),
+	}, nil
+}
+
+func (c *PortOneV2Client) portOneToken(ctx context.Context) (string, error) {
+	body, _ := json.Marshal(map[string]string{"apiSecret": c.cfg.SecretKey})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.BaseURL+"/login/api-secret", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.cfg.HTTPClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("portone token request failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("portone token rejected with status: %d", resp.StatusCode)
+	}
+	var tokenResp struct {
+		AccessToken string `json:"accessToken"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+		return "", fmt.Errorf("portone token decode failed: %w", err)
+	}
+	if tokenResp.AccessToken == "" {
+		return "", errors.New("portone token response missing accessToken")
+	}
+	return tokenResp.AccessToken, nil
+}
+
+func (c *PortOneV2Client) ConfirmPayment(ctx context.Context, paymentKey, orderID string, amount int64) error {
+	if c.sandbox() {
+		return nil
+	}
+	token, err := c.portOneToken(ctx)
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/payments/%s", c.cfg.BaseURL, paymentKey), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := c.cfg.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("portone payment lookup failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("portone payment lookup rejected with status: %d", resp.StatusCode)
+	}
+	var payment struct {
+		Status string `json:"status"`
+		Amount struct {
+			Total int64 `json:"total"`
+		} `json:"amount"`
+		OrderName string `json:"orderName"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payment); err != nil {
+		return fmt.Errorf("portone payment decode failed: %w", err)
+	}
+	if payment.Status != "PAID" {
+		return ErrPGPaymentCancelled
+	}
+	if payment.Amount.Total != amount {
+		return fmt.Errorf("%w: ledger amount %d != order amount %d", ErrPGSessionFailed, payment.Amount.Total, amount)
+	}
+	return nil
+}
+
+func (c *PortOneV2Client) VerifyWebhookSignature(payload []byte, signatureHeader string) bool {
 	if c.cfg.WebhookSecret == "" {
 		return true // Sandbox permissive
 	}

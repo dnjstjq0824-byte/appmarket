@@ -19,4 +19,6 @@ COPY backend/db/migrations /app/db/migrations
 RUN chown -R app:app /app
 USER 10001:10001
 EXPOSE 8080
+HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=6 \
+  CMD wget -q -O- http://localhost:8080/healthz/live >/dev/null || exit 1
 ENTRYPOINT ["/usr/local/bin/api"]

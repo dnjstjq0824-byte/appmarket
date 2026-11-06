@@ -61,13 +61,18 @@
         </div>
 
         <div class="form-actions">
-          <button 
-            type="submit" 
-            class="btn btn-primary" 
+          <button
+            type="submit"
+            class="btn btn-primary"
             :disabled="!isFormValid || isSubmitting"
           >
             {{ isSubmitting ? 'Submitting Report...' : 'Submit Report for Triage' }}
           </button>
+        </div>
+
+        <div v-if="submitError" class="form-error">{{ submitError }}</div>
+        <div v-if="ticketId" class="form-success">
+          신고가 접수되었습니다. 티켓 ID: <strong>{{ ticketId }}</strong> (우선순위: {{ ticketPriority }})
         </div>
       </form>
     </div>
@@ -76,6 +81,9 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { getSharedClient, ApiClientError } from '@bookingnetwork/api-client';
+
+const api = getSharedClient();
 
 const form = ref({
   appIdentifier: '',
@@ -86,6 +94,9 @@ const form = ref({
 });
 
 const isSubmitting = ref(false);
+const submitError = ref('');
+const ticketId = ref('');
+const ticketPriority = ref('');
 
 const isFormValid = computed(() => {
   return form.value.appIdentifier.trim().length > 3 &&
@@ -98,28 +109,22 @@ const isFormValid = computed(() => {
 async function submitReport() {
   if (!isFormValid.value) return;
   isSubmitting.value = true;
+  submitError.value = '';
+  ticketId.value = '';
 
   try {
-    const res = await fetch('/api/v1/moderation/reports', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form.value)
-    });
-
-    if (res.ok) {
-      alert('Report received. A ticket ID has been generated and sent to your email.');
-      form.value = {
-        appIdentifier: '',
-        category: '',
-        reporterEmail: '',
-        description: '',
-        confirmAccuracy: false
-      };
-    } else {
-      alert('Failed to submit report. Please try again.');
-    }
+    const res = await api.fileReport({ ...form.value });
+    ticketId.value = res.ticketId;
+    ticketPriority.value = res.priority;
+    form.value = {
+      appIdentifier: '',
+      category: '',
+      reporterEmail: '',
+      description: '',
+      confirmAccuracy: false
+    };
   } catch (err) {
-    console.error(err);
+    submitError.value = err instanceof ApiClientError ? err.message : 'Failed to submit report. Please try again.';
   } finally {
     isSubmitting.value = false;
   }
@@ -197,5 +202,7 @@ async function submitReport() {
 }
 .btn-primary { background: #2563eb; color: white; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.form-error { color: #b91c1c; font-size: 13px; margin-top: 12px; }
+.form-success { color: #059669; font-size: 13px; margin-top: 12px; }
 </style>
 

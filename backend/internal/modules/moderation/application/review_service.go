@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/moderation/domain"
+	"github.com/bookingnetwork/appmarket/backend/internal/platform/sanitize"
 )
 
 type InstallVerifier interface {
@@ -91,8 +92,8 @@ func (s *ReviewService) PostReview(ctx context.Context, in CreateReviewInput) (*
 		AppID:             in.AppID,
 		UserID:            in.UserID,
 		Rating:            in.Rating,
-		Title:             in.Title,
-		Comment:           in.Comment,
+		Title:             sanitize.Strict(in.Title),
+		Comment:           sanitize.Strict(in.Comment),
 		VersionCode:       in.VersionCode,
 		IsVerifiedInstall: true,
 		FraudScore:        fraudScore,

@@ -28,6 +28,7 @@ func (h *CatalogHandler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Get("/apps", h.handleListApps)
 	r.Get("/apps/{slug}", h.handleGetApp)
+	r.Get("/apps/{slug}/releases/latest", h.handleGetLatestRelease)
 	r.Get("/categories", h.handleGetCategories)
 	r.Get("/charts/{chartType}", h.handleGetChart)
 	return r
@@ -37,6 +38,7 @@ func (h *CatalogHandler) handleListApps(w http.ResponseWriter, r *http.Request) 
 	filter := domain.AppListFilter{
 		CategoryID: r.URL.Query().Get("category"),
 		TagID:      r.URL.Query().Get("tag"),
+		Query:      r.URL.Query().Get("q"),
 		Cursor:     r.URL.Query().Get("cursor"),
 	}
 	if r.URL.Query().Get("direct_only") == "true" {
@@ -106,7 +108,32 @@ func (h *CatalogHandler) handleGetCategories(w http.ResponseWriter, r *http.Requ
 	_ = json.NewEncoder(w).Encode(map[string]any{"items": cats})
 }
 
+func (h *CatalogHandler) handleGetLatestRelease(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	detail, err := h.svc.GetAppDetail(r.Context(), slug, "en-US")
+	if err != nil {
+		errors.WriteProblem(w, http.StatusNotFound, "ERR_APP_NOT_FOUND", "App not found", r.URL.Path)
+		return
+	}
+	rel, err := h.svc.LatestRelease(r.Context(), detail.App.ID)
+	if err != nil {
+		errors.WriteProblem(w, http.StatusNotFound, "ERR_RELEASE_NOT_FOUND", "No published release yet", r.URL.Path)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(rel)
+}
+
 func (h *CatalogHandler) handleGetChart(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"chart_type": chi.URLParam(r, "chartType"), "items": []any{}})
+	chartType := chi.URLParam(r, "chartType")
+	items, err := h.svc.GetChart(r.Context(), chartType)
+	if err != nil {
+		errors.WriteProblem(w, http.StatusBadRequest, "ERR_INVALID_CHART", "Unknown chart type. Use top_free, top_paid, trending, or top_grossing.", r.URL.Path)
+		return
+	}
+	if items == nil {
+		items = []domain.AppSummary{}
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"chart_type": chartType, "items": items})
 }

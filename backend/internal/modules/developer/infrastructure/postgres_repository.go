@@ -56,6 +56,52 @@ func (r *PostgresDeveloperRepository) GetOrgByID(ctx context.Context, orgID stri
 	return &org, nil
 }
 
+func (r *PostgresDeveloperRepository) SavePayoutRecord(ctx context.Context, rec *domain.PayoutRecord) error {
+	query := `
+		INSERT INTO developer_payout_accounts (
+			id, org_id, payout_currency, bank_name, account_holder_name,
+			account_number_ciphertext, swift_or_routing_code, account_last4, is_verified, updated_at
+		) VALUES (
+			gen_random_uuid(), $1::uuid, $2, $3, $4, $5, NULLIF($6, ''), $7, $8, NOW()
+		)
+		ON CONFLICT (org_id) DO UPDATE SET
+			payout_currency = EXCLUDED.payout_currency,
+			bank_name = EXCLUDED.bank_name,
+			account_holder_name = EXCLUDED.account_holder_name,
+			account_number_ciphertext = EXCLUDED.account_number_ciphertext,
+			swift_or_routing_code = EXCLUDED.swift_or_routing_code,
+			account_last4 = EXCLUDED.account_last4,
+			is_verified = EXCLUDED.is_verified,
+			updated_at = NOW()
+	`
+	_, err := r.pool.Exec(ctx, query, rec.OrgID, rec.Currency, rec.BankName, rec.HolderName, rec.Ciphertext, rec.RoutingCode, rec.Last4, rec.IsVerified)
+	if err != nil {
+		return fmt.Errorf("failed to save payout account: %w", err)
+	}
+	return nil
+}
+
+func (r *PostgresDeveloperRepository) GetPayoutRecord(ctx context.Context, orgID string) (*domain.PayoutRecord, error) {
+	query := `
+		SELECT org_id, payout_currency, bank_name, account_holder_name,
+			COALESCE(swift_or_routing_code, ''), account_last4, account_number_ciphertext, is_verified
+		FROM developer_payout_accounts
+		WHERE org_id = $1::uuid
+	`
+	var rec domain.PayoutRecord
+	err := r.pool.QueryRow(ctx, query, orgID).Scan(
+		&rec.OrgID, &rec.Currency, &rec.BankName, &rec.HolderName,
+		&rec.RoutingCode, &rec.Last4, &rec.Ciphertext, &rec.IsVerified,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get payout account: %w", err)
+	}
+	return &rec, nil
+}
+
 func (r *PostgresDeveloperRepository) GetOrgBySlug(ctx context.Context, slug string) (*domain.DeveloperOrg, error) {
 	query := `
 		SELECT id, org_slug, display_name, verification_status, created_at, updated_at
@@ -73,6 +119,30 @@ func (r *PostgresDeveloperRepository) GetOrgBySlug(ctx context.Context, slug str
 		return nil, fmt.Errorf("failed to get org by slug: %w", err)
 	}
 	return &org, nil
+}
+
+func (r *PostgresDeveloperRepository) ListOrgsForUser(ctx context.Context, userID string) ([]domain.DeveloperOrg, error) {
+	query := `
+		SELECT o.id, o.org_slug, o.display_name, o.verification_status, o.created_at, o.updated_at
+		FROM developer_orgs o
+		JOIN developer_org_members m ON m.org_id = o.id
+		WHERE m.user_id = $1
+		ORDER BY o.created_at ASC
+	`
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list orgs for user: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.DeveloperOrg
+	for rows.Next() {
+		var org domain.DeveloperOrg
+		if err := rows.Scan(&org.ID, &org.OrgSlug, &org.OrgName, &org.VerificationStatus, &org.CreatedAt, &org.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan org: %w", err)
+		}
+		out = append(out, org)
+	}
+	return out, rows.Err()
 }
 
 func (r *PostgresDeveloperRepository) UpdateOrgStatus(ctx context.Context, orgID string, status domain.OrgVerificationStatus) error {
@@ -106,7 +176,8 @@ func (r *PostgresDeveloperRepository) CreateVerification(ctx context.Context, v 
 
 func (r *PostgresDeveloperRepository) GetLatestVerification(ctx context.Context, orgID string) (*domain.DeveloperVerification, error) {
 	query := `
-		SELECT id, org_id, 'BUSINESS_REGISTRATION', document_s3_vault_key, dns_txt_token, status, created_at
+		SELECT id, org_id, 'BUSINESS_REGISTRATION', document_s3_vault_key, dns_txt_token, status, created_at,
+			COALESCE(reviewer_id::text, ''), COALESCE(review_notes, ''), reviewed_at
 		FROM developer_verifications
 		WHERE org_id = $1
 		ORDER BY created_at DESC
@@ -115,6 +186,7 @@ func (r *PostgresDeveloperRepository) GetLatestVerification(ctx context.Context,
 	var v domain.DeveloperVerification
 	err := r.pool.QueryRow(ctx, query, orgID).Scan(
 		&v.ID, &v.OrgID, &v.DocType, &v.DocURL, &v.Domain, &v.Status, &v.SubmittedAt,
+		&v.ReviewerID, &v.ReviewNotes, &v.ReviewedAt,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -123,6 +195,46 @@ func (r *PostgresDeveloperRepository) GetLatestVerification(ctx context.Context,
 		return nil, fmt.Errorf("failed to get latest verification: %w", err)
 	}
 	return &v, nil
+}
+
+func (r *PostgresDeveloperRepository) DecideVerificationRecord(ctx context.Context, verificationID, status, reviewerID, notes string) error {
+	query := `
+		UPDATE developer_verifications
+		SET status = $2, reviewer_id = NULLIF($3, '')::uuid, review_notes = NULLIF($4, ''), reviewed_at = NOW()
+		WHERE id = $1::uuid
+	`
+	tag, err := r.pool.Exec(ctx, query, verificationID, status, reviewerID, notes)
+	if err != nil {
+		return fmt.Errorf("failed to decide verification: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrVerificationNotFound
+	}
+	return nil
+}
+
+func (r *PostgresDeveloperRepository) ListVerificationsByStatus(ctx context.Context, status string) ([]domain.DeveloperVerification, error) {
+	query := `
+		SELECT id, org_id, 'BUSINESS_REGISTRATION', document_s3_vault_key, dns_txt_token, status, created_at,
+			COALESCE(reviewer_id::text, ''), COALESCE(review_notes, ''), reviewed_at
+		FROM developer_verifications
+		WHERE status = $1
+		ORDER BY created_at ASC
+	`
+	rows, err := r.pool.Query(ctx, query, status)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list verifications: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.DeveloperVerification
+	for rows.Next() {
+		var v domain.DeveloperVerification
+		if err := rows.Scan(&v.ID, &v.OrgID, &v.DocType, &v.DocURL, &v.Domain, &v.Status, &v.SubmittedAt, &v.ReviewerID, &v.ReviewNotes, &v.ReviewedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
 }
 
 func (r *PostgresDeveloperRepository) AddMember(ctx context.Context, m *domain.OrgMember) error {
@@ -176,6 +288,17 @@ func (r *PostgresDeveloperRepository) ListMembers(ctx context.Context, orgID str
 		members = append(members, m)
 	}
 	return members, rows.Err()
+}
+
+func (r *PostgresDeveloperRepository) RemoveMember(ctx context.Context, orgID, userID string) error {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM developer_org_members WHERE org_id = $1 AND user_id = $2`, orgID, userID)
+	if err != nil {
+		return fmt.Errorf("failed to remove org member: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrMemberNotFound
+	}
+	return nil
 }
 
 func (r *PostgresDeveloperRepository) CreateAPIKey(ctx context.Context, k *domain.APIKey) error {

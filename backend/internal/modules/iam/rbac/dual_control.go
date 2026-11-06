@@ -14,6 +14,7 @@ type DualApprovalRepository interface {
 	CreateRequest(ctx context.Context, req *domain.DualApprovalRequest) error
 	GetRequestByID(ctx context.Context, id string) (*domain.DualApprovalRequest, error)
 	UpdateRequest(ctx context.Context, req *domain.DualApprovalRequest) error
+	ListPending(ctx context.Context) ([]*domain.DualApprovalRequest, error)
 }
 
 type InMemoryDualApprovalRepo struct {
@@ -51,6 +52,19 @@ func (r *InMemoryDualApprovalRepo) UpdateRequest(ctx context.Context, req *domai
 	defer r.mu.Unlock()
 	r.requests[req.ID] = req
 	return nil
+}
+
+func (r *InMemoryDualApprovalRepo) ListPending(ctx context.Context) ([]*domain.DualApprovalRequest, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]*domain.DualApprovalRequest, 0)
+	for _, req := range r.requests {
+		if req.Status == domain.ApprovalPending {
+			c := *req
+			out = append(out, &c)
+		}
+	}
+	return out, nil
 }
 
 type DualControlEngine struct {
@@ -94,6 +108,11 @@ func (e *DualControlEngine) CreateRequest(
 	}
 
 	return req, nil
+}
+
+// ListPending returns requests still awaiting a second administrator decision.
+func (e *DualControlEngine) ListPending(ctx context.Context) ([]*domain.DualApprovalRequest, error) {
+	return e.repo.ListPending(ctx)
 }
 
 // Approve processes approval from a second administrator (TC-SEC-006).

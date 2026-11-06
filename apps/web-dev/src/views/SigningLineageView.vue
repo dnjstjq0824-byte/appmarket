@@ -5,29 +5,47 @@
       <p class="subtitle">Android v2/v3 Signature Block analysis and Proof-of-Rotation lineage tree</p>
     </div>
 
-    <div class="status-summary-card" :class="lineageStatusClass">
-      <div class="status-icon">{{ lineageStatusIcon }}</div>
+    <div v-if="orgs.length > 0" class="org-row">
+      <label for="orgSelect">Organization</label>
+      <select id="orgSelect" v-model="activeOrgId" @change="loadLineage">
+        <option v-for="org in orgs" :key="org.id" :value="org.id">{{ org.org_name }}</option>
+      </select>
+    </div>
+    <div v-if="isLoading" class="loading-row">Loading signing lineage…</div>
+    <div v-if="loadError" class="load-error">{{ loadError }}</div>
+
+    <div v-if="!isLoading && !loadError" class="status-summary-card" :class="lineageStatusClass">
       <div class="status-info">
         <h3>{{ lineageStatusTitle }}</h3>
         <p>{{ lineageStatusDescription }}</p>
       </div>
     </div>
 
-    <!-- Lineage Tree -->
-    <div class="lineage-tree-section">
-      <h3>Signature Lineage Chain (v3 Proof-of-Rotation)</h3>
-      <div class="lineage-nodes">
-        <div v-for="(node, index) in lineageNodes" :key="node.certSha256" class="lineage-node-container">
-          <div class="lineage-node" :class="{ 'is-current': node.isCurrent, 'is-root': node.isRoot }">
+    <!-- Releases -->
+    <div v-if="!isLoading && !loadError" class="lineage-tree-section">
+      <h3>Releases ({{ releases.length }})</h3>
+      <div v-if="releases.length === 0" class="empty-row">No releases recorded for this app.</div>
+      <div v-else class="release-list">
+        <div v-for="rel in releases" :key="rel.id" class="release-row">
+          <strong>v{{ rel.versionName }}</strong>
+          <span class="font-mono">build {{ rel.versionCode }}</span>
+          <span class="badge badge-secondary">{{ rel.track }}</span>
+          <span class="badge badge-primary">{{ rel.status }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signature nodes -->
+    <div v-if="!isLoading && !loadError" class="lineage-tree-section">
+      <h3>Recorded Signing Keys ({{ signatures.length }})</h3>
+      <div v-if="signatures.length === 0" class="empty-row">No signatures recorded yet.</div>
+      <div v-else class="lineage-nodes">
+        <div v-for="node in signatures" :key="node.artifactId" class="lineage-node-container">
+          <div class="lineage-node" :class="{ 'is-current': node.isPrimary }">
             <div class="node-badge">
-              <span v-if="node.isRoot" class="badge badge-primary">Initial Root Key</span>
-              <span v-else-if="node.isCurrent" class="badge badge-success">Active Signing Key</span>
-              <span v-else class="badge badge-secondary">Intermediate Key</span>
-            </div>
-            
-            <div class="node-field">
-              <label>Subject DN</label>
-              <div class="font-mono text-sm">{{ node.subjectDn }}</div>
+              <span v-if="node.isPrimary" class="badge badge-success">Primary Lineage Key</span>
+              <span v-else class="badge badge-secondary">Recorded Key</span>
+              <span class="badge badge-primary">Scheme v{{ node.schemeVersion }}</span>
             </div>
 
             <div class="node-field">
@@ -36,16 +54,9 @@
             </div>
 
             <div class="node-meta">
-              <span>Valid From: {{ node.validFrom }}</span>
-              <span>Valid Until: {{ node.validUntil }}</span>
-              <span v-if="node.rotationFlags">Flags: <code>{{ node.rotationFlags }}</code></span>
+              <span>Distribution: <code>{{ node.distributionId }}</code></span>
+              <span>Artifact: <code>{{ node.artifactId }}</code></span>
             </div>
-          </div>
-
-          <!-- Connector Arrow -->
-          <div v-if="index < lineageNodes.length - 1" class="lineage-connector">
-            <div class="arrow-down">⬇️</div>
-            <span class="rotation-label">Rotated via v3 Proof-of-Rotation</span>
           </div>
         </div>
       </div>
@@ -64,44 +75,78 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { getSharedClient, ApiClientError, type OrgSummary } from '@bookingnetwork/api-client';
 
-interface LineageNode {
-  isRoot: boolean;
-  isCurrent: boolean;
-  subjectDn: string;
+const api = getSharedClient();
+
+interface SignatureNode {
+  distributionId: string;
+  artifactId: string;
   certSha256: string;
-  validFrom: string;
-  validUntil: string;
-  rotationFlags?: string;
+  schemeVersion: number;
+  isPrimary: boolean;
 }
 
-const lineageNodes = ref<LineageNode[]>([
-  {
-    isRoot: true,
-    isCurrent: false,
-    subjectDn: 'CN=BookingNetwork Dev, OU=Mobile, O=BookingNetwork Inc, C=KR',
-    certSha256: '9A4C73E1829B6342817490FBCDA4812304918234ABCDEF1234567890ABCDEF12',
-    validFrom: '2022-01-01',
-    validUntil: '2047-01-01',
-    rotationFlags: 'FLAG_PERMIT_ROTATION'
-  },
-  {
-    isRoot: false,
-    isCurrent: true,
-    subjectDn: 'CN=BookingNetwork Prod 2026, OU=Mobile, O=BookingNetwork Inc, C=KR',
-    certSha256: '14B991BD744BC4E37BB68043FB6CFCF27018234ABCDEF1234567890ABCDEF99',
-    validFrom: '2026-01-01',
-    validUntil: '2051-01-01',
-    rotationFlags: 'FLAG_ACTIVE'
-  }
-]);
+interface ReleaseNode {
+  id: string;
+  versionName: string;
+  versionCode: number;
+  track: string;
+  status: string;
+}
 
-const lineageStatusClass = computed(() => 'status-valid');
-const lineageStatusIcon = computed(() => '🛡️');
-const lineageStatusTitle = computed(() => 'Cryptographically Continuous Lineage');
-const lineageStatusDescription = computed(
-  () => 'The signature lineage contains valid cryptographic proof-of-rotation connecting current key to root key.'
+const orgs = ref<OrgSummary[]>([]);
+const activeOrgId = ref('');
+const signatures = ref<SignatureNode[]>([]);
+const releases = ref<ReleaseNode[]>([]);
+const isLoading = ref(true);
+const loadError = ref('');
+
+onMounted(async () => {
+  try {
+    orgs.value = await api.listOrgs();
+    if (orgs.value.length > 0) {
+      activeOrgId.value = orgs.value[0].id;
+      await loadLineage();
+    }
+  } catch (err) {
+    loadError.value = err instanceof ApiClientError ? err.message : 'Failed to load organizations';
+  } finally {
+    isLoading.value = false;
+  }
+});
+
+async function loadLineage() {
+  if (!activeOrgId.value) return;
+  isLoading.value = true;
+  loadError.value = '';
+  try {
+    const lineage = await api.getLineage('current', activeOrgId.value) as { releases: ReleaseNode[]; signatures: SignatureNode[] };
+    releases.value = lineage.releases || [];
+    signatures.value = lineage.signatures || [];
+  } catch (err) {
+    loadError.value = err instanceof ApiClientError ? err.message : 'Failed to load lineage';
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+const hasV2Plus = computed(() => signatures.value.some(s => s.schemeVersion >= 2));
+const lineageStatusClass = computed(() => (hasV2Plus.value ? 'status-valid' : 'status-warn'));
+const lineageStatusTitle = computed(() =>
+  signatures.value.length === 0
+    ? 'No Signatures Recorded'
+    : hasV2Plus.value
+      ? 'Verified v2/v3 Signing Lineage'
+      : 'Legacy v1 Signatures Only'
+);
+const lineageStatusDescription = computed(() =>
+  signatures.value.length === 0
+    ? 'Upload a signed binary to record its certificate lineage.'
+    : hasV2Plus.value
+      ? `${signatures.value.length} signature record(s) on file. All current keys meet the v2+ scheme requirement.`
+      : 'Current signatures use scheme v1. Re-sign with v2/v3 to meet the release requirement.'
 );
 </script>
 
@@ -131,8 +176,59 @@ const lineageStatusDescription = computed(
   border: 1px solid #bbf7d0;
   color: #166534;
 }
-.status-icon {
-  font-size: 32px;
+.status-warn {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+.org-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.org-row select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+}
+.loading-row {
+  padding: 16px;
+  color: #64748b;
+  font-size: 14px;
+}
+.load-error {
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.empty-row {
+  padding: 16px;
+  color: #64748b;
+  font-size: 14px;
+  text-align: center;
+}
+.release-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.release-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 13px;
 }
 .status-info h3 {
   margin: 0 0 4px 0;

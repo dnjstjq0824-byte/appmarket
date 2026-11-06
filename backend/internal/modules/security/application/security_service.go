@@ -15,8 +15,10 @@ import (
 type SecurityRepository interface {
 	SaveScanReport(ctx context.Context, report *domain.SecurityScanReport) error
 	GetScanReportByArtifact(ctx context.Context, artifactID string) (*domain.SecurityScanReport, error)
+	ListScanReports(ctx context.Context) ([]domain.SecurityScanReport, error)
 	SetKillSwitch(ctx context.Context, state *domain.KillSwitchState) error
 	GetKillSwitch(ctx context.Context, appID string) (*domain.KillSwitchState, error)
+	ListKillSwitches(ctx context.Context) ([]domain.KillSwitchState, error)
 }
 
 type InMemorySecurityRepo struct {
@@ -68,11 +70,31 @@ func (r *InMemorySecurityRepo) GetKillSwitch(ctx context.Context, appID string) 
 	return &c, nil
 }
 
+func (r *InMemorySecurityRepo) ListKillSwitches(ctx context.Context) ([]domain.KillSwitchState, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]domain.KillSwitchState, 0, len(r.killSwitches))
+	for _, s := range r.killSwitches {
+		out = append(out, *s)
+	}
+	return out, nil
+}
+
 type SecurityService struct {
 	repo           SecurityRepository
 	malwareScanner *scanner.MalwareScanner
 	engineVersion  string
 	mu             sync.RWMutex
+}
+
+func (r *InMemorySecurityRepo) ListScanReports(ctx context.Context) ([]domain.SecurityScanReport, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]domain.SecurityScanReport, 0, len(r.reports))
+	for _, rep := range r.reports {
+		out = append(out, *rep)
+	}
+	return out, nil
 }
 
 func NewSecurityService(repo SecurityRepository) *SecurityService {
@@ -158,6 +180,26 @@ func (s *SecurityService) RevokeKillSwitch(ctx context.Context, appID string) er
 		TriggeredAt: time.Now().UTC(),
 	}
 	return s.repo.SetKillSwitch(ctx, state)
+}
+
+// ListKillSwitches returns every kill-switch record, triggered or resolved.
+func (s *SecurityService) ListKillSwitches(ctx context.Context) ([]domain.KillSwitchState, error) {
+	return s.repo.ListKillSwitches(ctx)
+}
+
+// ScanReport returns the stored scan report for an artifact, or nil.
+func (s *SecurityService) ScanReport(ctx context.Context, artifactID string) (*domain.SecurityScanReport, error) {
+	return s.repo.GetScanReportByArtifact(ctx, artifactID)
+}
+
+// ListScanReports returns every stored scan report, newest last.
+func (s *SecurityService) ListScanReports(ctx context.Context) ([]domain.SecurityScanReport, error) {
+	return s.repo.ListScanReports(ctx)
+}
+
+// KillSwitchState returns the current kill-switch record for an app, or nil.
+func (s *SecurityService) KillSwitchState(ctx context.Context, appID string) (*domain.KillSwitchState, error) {
+	return s.repo.GetKillSwitch(ctx, appID)
 }
 
 // ValidateDownloadRequest verifies whether the app is allowed for download or blocked by Kill Switch (TC-SEC-010).

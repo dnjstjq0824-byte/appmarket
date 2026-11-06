@@ -25,6 +25,7 @@
             <span class="bn-user-name">{{ devUser.name }}</span>
             <span class="bn-user-org">{{ devUser.email }}</span>
           </div>
+          <button class="bn-logout-btn" @click="logout">로그아웃</button>
         </div>
       </div>
     </header>
@@ -112,31 +113,51 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { getSharedClient, clearSession, isAuthenticated } from '@bookingnetwork/api-client';
 
-const orgName = ref('OmniWork Technologies');
-const kybStatus = ref('UNVERIFIED');
+const router = useRouter();
+const api = getSharedClient();
+
+const orgName = ref('—');
+const kybStatus = ref('UNKNOWN');
 const devUser = ref({
-  name: 'Lead Developer',
-  email: 'dev@bookingnetwork.org'
+  name: 'Developer',
+  email: ''
 });
 
-onMounted(() => {
-  if (typeof window !== 'undefined') {
-    const savedKyb = localStorage.getItem('bn_kyb_status');
-    if (savedKyb) {
-      kybStatus.value = savedKyb;
+onMounted(async () => {
+  if (!isAuthenticated()) {
+    return;
+  }
+  try {
+    const me = await api.getMe();
+    devUser.value.email = me.email || '';
+    devUser.value.name = (me.email || 'Developer').split('@')[0];
+  } catch {
+    clearSession();
+    await router.push('/login');
+    return;
+  }
+  try {
+    const orgs = await api.listOrgs();
+    if (orgs.length > 0) {
+      orgName.value = orgs[0].org_name;
+      kybStatus.value = orgs[0].verification_status || 'UNVERIFIED';
+    } else {
+      orgName.value = 'No organization';
+      kybStatus.value = 'UNVERIFIED';
     }
-    const savedUser = localStorage.getItem('bn_dev_profile');
-    if (savedUser) {
-      try {
-        const u = JSON.parse(savedUser);
-        if (u.name) devUser.value.name = u.name;
-        if (u.email) devUser.value.email = u.email;
-        if (u.org) orgName.value = u.org;
-      } catch { /* default */ }
-    }
+  } catch {
+    orgName.value = '—';
+    kybStatus.value = 'UNKNOWN';
   }
 });
+
+async function logout() {
+  clearSession();
+  await router.push('/login');
+}
 </script>
 
 <style>
@@ -295,6 +316,22 @@ body {
 .bn-user-org {
   font-size: 11px;
   color: #64748b;
+}
+
+.bn-logout-btn {
+  background: none;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+.bn-logout-btn:hover {
+  background-color: #1e293b;
+  color: #f8fafc;
 }
 
 /* Layout Body */

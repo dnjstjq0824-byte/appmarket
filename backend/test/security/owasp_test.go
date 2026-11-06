@@ -2,6 +2,9 @@ package security_test
 
 import (
 	"context"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -148,4 +151,37 @@ func TestOWASP_SecurityEnforcements(t *testing.T) {
 		}
 		t.Log("KMS Envelope encryption & blind index verification passed 100%.")
 	})
+}
+
+// TestOWASP_NoCookieAuth_NoCSRFVector pins the stateless Bearer-only session
+// design: no production handler may issue cookies, so browsers attach no
+// ambient credentials and CSRF has no attack vector by construction.
+func TestOWASP_NoCookieAuth_NoCSRFVector(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatalf("failed to resolve backend root: %v", err)
+	}
+	var offenders []string
+	walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(body), "Set-Cookie") || strings.Contains(string(body), "http.SetCookie") {
+			offenders = append(offenders, path)
+		}
+		return nil
+	})
+	if walkErr != nil {
+		t.Fatalf("walk failed: %v", walkErr)
+	}
+	if len(offenders) > 0 {
+		t.Fatalf("cookie auth detected (CSRF vector introduced): %v", offenders)
+	}
 }

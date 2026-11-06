@@ -26,11 +26,35 @@ var (
 	ErrSessionRevoked            = errors.New("ERR_SESSION_REVOKED: session has been revoked")
 	ErrMFARequired               = errors.New("ERR_MFA_REQUIRED: multi-factor authentication is required")
 	ErrInvalidMFACode            = errors.New("ERR_INVALID_MFA_CODE: invalid TOTP code or recovery code")
+	ErrMFAAlreadyEnrolled        = errors.New("ERR_MFA_ALREADY_ENROLLED: a verified MFA credential already exists")
 	ErrDualControlSelfApproval   = errors.New("ERR_DUAL_CONTROL_SELF_APPROVAL_FORBIDDEN: initiator cannot approve own request")
 	ErrDualApprovalAlreadyClosed = errors.New("ERR_DUAL_APPROVAL_ALREADY_CLOSED: request has already been decided")
 	ErrUnauthorized              = errors.New("ERR_UNAUTHORIZED: authentication required")
 	ErrForbidden                 = errors.New("ERR_FORBIDDEN: insufficient permissions")
+	ErrOAuthProviderUnknown      = errors.New("ERR_OAUTH_PROVIDER_UNKNOWN: social login provider is not configured")
+	ErrOAuthExchangeFailed       = errors.New("ERR_OAUTH_EXCHANGE_FAILED: authorization code exchange failed")
+	ErrOAuthIDTokenInvalid       = errors.New("ERR_OAUTH_ID_TOKEN_INVALID: identity token verification failed")
+	ErrOAuthStateInvalid         = errors.New("ERR_OAUTH_STATE_INVALID: login session expired or forged")
+	ErrOAuthEmailMissing         = errors.New("ERR_OAUTH_EMAIL_MISSING: provider did not return a verified email")
 )
+
+// Federated identity providers. Values match user_identities.provider CHECK.
+const (
+	IdentityProviderGoogle   = "GOOGLE_OIDC"
+	IdentityProviderGitHub   = "GITHUB_OAUTH"
+	IdentityProviderApple    = "APPLE_OIDC"
+	IdentityProviderTreeScan = "TREESCAN_OIDC"
+)
+
+// UserIdentity links a local user to a federated provider subject.
+type UserIdentity struct {
+	ID              string    `json:"id"`
+	UserID          string    `json:"user_id"`
+	Provider        string    `json:"provider"`
+	ProviderSubject string    `json:"provider_subject"`
+	ProviderEmail   string    `json:"provider_email,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+}
 
 type User struct {
 	ID                  string     `json:"id"`

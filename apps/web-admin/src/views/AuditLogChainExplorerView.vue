@@ -30,7 +30,15 @@
       <strong>감사 체인 검증 완료: 전체 {{ auditLogs.length }}개 레코드의 암호학적 링크가 100% 무결합니다.</strong>
     </div>
 
-    <div class="bn-form-card">
+    <div v-if="serverChainValid === false" class="bn-alert bn-alert-danger">
+      <strong>서버 체인 파손 보고 (Block #{{ serverChainFailedAt }}). 즉시 보안팀에 보고하고 시스템을 동결하십시오.</strong>
+    </div>
+
+    <div v-if="isLoading" class="bn-loading">불러오는 중…</div>
+    <div v-if="loadError" class="bn-error">{{ loadError }}</div>
+    <div v-if="!isLoading && !loadError && auditLogs.length === 0" class="bn-empty">감사 로그가 없습니다.</div>
+
+    <div v-if="!isLoading && !loadError" class="bn-form-card">
       <table class="bn-table">
         <thead>
           <tr>
@@ -44,12 +52,12 @@
         </thead>
         <tbody>
           <tr v-for="log in auditLogs" :key="log.id">
-            <td class="bn-text-muted">{{ log.createdAt }}</td>
-            <td><strong>{{ log.actorId }}</strong></td>
+            <td class="bn-text-muted">{{ log.created_at }}</td>
+            <td><strong>{{ log.actor_id }}</strong></td>
             <td><span class="bn-action-pill">{{ log.action }}</span></td>
-            <td>{{ log.targetType }}: {{ log.targetId }}</td>
-            <td><BnHashFingerprintBadge :hash="log.prevHash" /></td>
-            <td><BnHashFingerprintBadge :hash="log.recordHash" /></td>
+            <td>{{ log.target_type }}: {{ log.target_id }}</td>
+            <td><BnHashFingerprintBadge :hash="log.prev_hash" /></td>
+            <td><BnHashFingerprintBadge :hash="log.record_hash" /></td>
           </tr>
         </tbody>
       </table>
@@ -58,40 +66,89 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { BnHashFingerprintBadge } from '@bookingnetwork/ui-kit'
+import { getSharedClient, ApiClientError } from '@bookingnetwork/api-client'
+
+const api = getSharedClient()
+
+interface AuditRecord {
+  id: string
+  seq?: number
+  actor_id: string
+  action: string
+  target_type: string
+  target_id: string
+  diff_json?: string
+  ip_address?: string
+  prev_hash: string
+  record_hash: string
+  created_at: string
+  created_at_nano?: string
+}
 
 const verifying = ref(false)
 const integrityStatus = ref<'UNCHECKED' | 'VERIFIED_OK' | 'TAMPERED'>('UNCHECKED')
 const tamperedIndex = ref<number | null>(null)
+const serverChainValid = ref<boolean | null>(null)
+const serverChainFailedAt = ref(-1)
 
-const auditLogs = ref([
-  {
-    id: '1',
-    actorId: 'admin-super-001',
-    action: 'GRANT_ROLE',
-    targetType: 'USER',
-    targetId: 'user-dev-99',
-    prevHash: '0000000000000000000000000000000000000000000000000000000000000000',
-    recordHash: 'a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0',
-    createdAt: '2026-10-31 08:00:00'
-  },
-  {
-    id: '2',
-    actorId: 'admin-sec-002',
-    action: 'TRIGGER_KILL_SWITCH',
-    targetType: 'APP',
-    targetId: 'app-trojan-target',
-    prevHash: 'a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0',
-    recordHash: 'b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef01a',
-    createdAt: '2026-10-31 09:15:22'
+const auditLogs = ref<AuditRecord[]>([])
+const isLoading = ref(true)
+const loadError = ref('')
+
+onMounted(async () => {
+  await loadLogs()
+  isLoading.value = false
+})
+
+async function loadLogs() {
+  loadError.value = ''
+  try {
+    const res = await api.listAuditLogs(200)
+    serverChainValid.value = res.chainValid
+    serverChainFailedAt.value = res.chainFailedAt ?? -1
+    auditLogs.value = res.records || []
+  } catch (err) {
+    loadError.value = err instanceof ApiClientError ? err.message : 'Failed to load audit logs'
   }
-])
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')
+}
 
 async function verifyChain() {
   verifying.value = true
+  integrityStatus.value = 'UNCHECKED'
+  tamperedIndex.value = null
   try {
-    await new Promise(r => setTimeout(r, 600))
+    await loadLogs()
+    let prev = ''
+    for (let i = 0; i < auditLogs.value.length; i++) {
+      const log = auditLogs.value[i]
+      if (i > 0 && log.prev_hash !== prev) {
+        integrityStatus.value = 'TAMPERED'
+        tamperedIndex.value = i
+        return
+      }
+      if (log.prev_hash && log.record_hash && log.created_at_nano) {
+        const payload = [log.prev_hash, log.actor_id, log.action, log.target_type, log.target_id, log.diff_json || '', String(log.created_at_nano)].join('|')
+        const recomputed = await sha256Hex(payload)
+        if (recomputed !== log.record_hash.toLowerCase()) {
+          integrityStatus.value = 'TAMPERED'
+          tamperedIndex.value = i
+          return
+        }
+      }
+      prev = log.record_hash
+    }
+    if (serverChainValid.value === false) {
+      integrityStatus.value = 'TAMPERED'
+      tamperedIndex.value = serverChainFailedAt.value
+      return
+    }
     integrityStatus.value = 'VERIFIED_OK'
   } finally {
     verifying.value = false

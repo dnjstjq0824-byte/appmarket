@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -19,7 +20,9 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 
+	iamApp "github.com/bookingnetwork/appmarket/backend/internal/modules/iam/application"
 	"github.com/bookingnetwork/appmarket/backend/internal/platform/httpserver"
+	"github.com/bookingnetwork/appmarket/backend/internal/platform/sentryx"
 )
 
 func requiredEnv(name string) string {
@@ -34,6 +37,11 @@ func requiredEnv(name string) string {
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
+	if err := sentryx.Init(os.Getenv("SENTRY_DSN"), optionalEnv("APP_ENV", "development")); err != nil {
+		logger.Error("Sentry initialization failed", "error", err)
+		os.Exit(1)
+	}
+	defer sentryx.Flush(5 * time.Second)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	initCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -79,11 +87,42 @@ func main() {
 		os.Exit(1)
 	}
 
+	jwtKey, err := loadJWTPrivateKey(os.Getenv("JWT_PRIVATE_KEY_PEM"), os.Getenv("APP_ENV"), logger)
+	if err != nil {
+		logger.Error("JWT signing key configuration failed", "error", err)
+		os.Exit(1)
+	}
+
 	app, err := httpserver.New(httpserver.Config{
 		DB: db, Redis: cache, OpenSearchURL: requiredEnv("OPENSEARCH_URL"),
 		S3HealthURL: requiredEnv("S3_HEALTH_URL"), OpenSearchUser: os.Getenv("OPENSEARCH_USER"),
 		OpenSearchPass: os.Getenv("OPENSEARCH_PASSWORD"), AllowedOrigin: os.Getenv("ALLOWED_ORIGIN"),
 		TrustedProxyCIDRs: splitCIDRs(os.Getenv("TRUSTED_PROXY_CIDRS")), Logger: logger,
+		IAMHMACSecret: requiredEnv("IAM_HMAC_SECRET"),
+		DistributionTokenSecret: requiredEnv("DISTRIBUTION_TOKEN_SECRET"),
+		PGWebhookSecret: requiredEnv("PG_WEBHOOK_SECRET"),
+		PayoutEncryptionKey: requiredEnv("PAYOUT_ENC_KEY"),
+		JWTIssuer: optionalEnv("JWT_ISSUER", "https://auth.appmarket.local"),
+		JWTPrivateKey: jwtKey,
+		CDNDomain: optionalEnv("CDN_DOMAIN", "cdn.appmarket.local"),
+		PublicBaseURL: optionalEnv("PUBLIC_BASE_URL", "https://appmarket.bookingnetwork.internal"),
+		PGProvider: optionalEnv("PG_PROVIDER", "toss"),
+		TossSecretKey: os.Getenv("TOSS_SECRET_KEY"),
+		PortOneAPIKey: os.Getenv("PORTONE_API_KEY"),
+		PortOneStoreID: os.Getenv("PORTONE_STORE_ID"),
+		PGIsLive: os.Getenv("PG_IS_LIVE") == "true",
+		SentryDSN: os.Getenv("SENTRY_DSN"),
+		AppEnv: optionalEnv("APP_ENV", "development"),
+		OAuthRedirectBaseURL: os.Getenv("OAUTH_REDIRECT_BASE_URL"),
+		GoogleClientID: os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GitHubClientID: os.Getenv("GITHUB_CLIENT_ID"),
+		GitHubClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
+		AppleClientID: os.Getenv("APPLE_CLIENT_ID"),
+		AppleTeamID: os.Getenv("APPLE_TEAM_ID"),
+		AppleKeyID: os.Getenv("APPLE_KEY_ID"),
+		ApplePrivateKeyPEM: os.Getenv("APPLE_PRIVATE_KEY_PEM"),
+		MediaBucket: optionalEnv("MEDIA_BUCKET", "bn-public-media"),
 	})
 	if err != nil {
 		logger.Error("HTTP server configuration failed", "error", err)
@@ -108,6 +147,28 @@ func main() {
 			os.Exit(1)
 		}
 	}
+}
+
+func optionalEnv(name, fallback string) string {
+	if v := strings.TrimSpace(os.Getenv(name)); v != "" {
+		return v
+	}
+	return fallback
+}
+
+// loadJWTPrivateKey parses the RS256 signing key. Production refuses to boot
+// without an explicit key because an ephemeral key would invalidate every
+// issued token on restart and diverge across replicas. Development falls back
+// to an ephemeral key with a loud warning.
+func loadJWTPrivateKey(pemValue, appEnv string, logger *slog.Logger) (*rsa.PrivateKey, error) {
+	if strings.TrimSpace(pemValue) == "" {
+		if appEnv == "production" {
+			return nil, errors.New("JWT_PRIVATE_KEY_PEM is required in production")
+		}
+		logger.Warn("JWT_PRIVATE_KEY_PEM unset: using ephemeral signing key (development only)")
+		return nil, nil
+	}
+	return iamApp.ParseRSAPrivateKeyPEM([]byte(pemValue))
 }
 
 func splitCIDRs(value string) []string {

@@ -1,221 +1,348 @@
 <template>
-  <div class="account-library-container">
-    <div class="library-header">
-      <h2>My App Library & Entitlements (USR-18)</h2>
-      <p class="subtitle">Permanent purchase records, licensed applications, and secure re-downloads</p>
+  <main class="bn-container">
+    <section class="bn-library-header">
+      <div>
+        <h1>내 앱 보관함 및 구독 관리</h1>
+        <p class="bn-sub">구매한 유료 앱의 영구 이용 권한과 다운로드 이력을 관리합니다.</p>
+      </div>
+      <div class="bn-header-stats">
+        <div class="bn-stat-box">
+          <span class="bn-stat-label">보유 앱</span>
+          <strong class="bn-stat-value">{{ entitlements.length }}개</strong>
+        </div>
+        <div class="bn-stat-box">
+          <span class="bn-stat-label">주문 내역</span>
+          <strong class="bn-stat-value">{{ orders.length }}건</strong>
+        </div>
+      </div>
+    </section>
+
+    <div v-if="isLoading" class="bn-status">보관함을 불러오는 중…</div>
+    <div v-if="loadError" class="bn-status bn-error-text">
+      {{ loadError }}
+      <NuxtLink v-if="needsLogin" to="/account/login">로그인하기</NuxtLink>
     </div>
 
-    <div class="library-stats">
-      <div class="stat-pill">
-        <label>Total Entitlements</label>
-        <span class="val font-mono">{{ libraryItems.length }}</span>
-      </div>
-      <div class="stat-pill">
-        <label>Installed on Device</label>
-        <span class="val font-mono">2</span>
-      </div>
-      <div class="stat-pill">
-        <label>Pending Updates</label>
-        <span class="val font-mono text-warning">1 Update</span>
-      </div>
-    </div>
-
-    <!-- Library Table -->
-    <div class="library-table-card">
-      <table class="library-table">
-        <thead>
-          <tr>
-            <th>Application</th>
-            <th>License / Purchase Date</th>
-            <th>Installed Build</th>
-            <th>Store Latest Build</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in libraryItems" :key="item.appId">
-            <td class="app-info-cell">
-              <div class="app-icon">📦</div>
-              <div>
-                <strong>{{ item.title }}</strong>
-                <div class="font-mono text-xs text-muted">{{ item.packageName }}</div>
-              </div>
-            </td>
-            <td>
-              <span class="badge" :class="item.isPaid ? 'badge-paid' : 'badge-free'">
-                {{ item.isPaid ? 'Purchased (₩' + item.price.toLocaleString() + ')' : 'Free License' }}
-              </span>
-              <div class="date-text text-xs">{{ item.acquiredDate }}</div>
-            </td>
-            <td class="font-mono text-sm">v{{ item.installedVersionName }}</td>
-            <td class="font-mono text-sm">
-              v{{ item.latestVersionName }}
-              <span v-if="item.updateAvailable" class="badge badge-warning text-xs">Update</span>
-            </td>
-            <td>
-              <div class="action-buttons">
-                <button @click="downloadFreshApk(item)" class="btn btn-primary btn-sm">
-                  📥 Download APK
-                </button>
-                <NuxtLink :to="'/apps/' + item.slug" class="btn btn-outline btn-sm">
-                  Details
+    <section v-if="!isLoading && !loadError">
+      <h2>보유 앱 (Entitlements)</h2>
+      <div v-if="entitlements.length === 0" class="bn-status">보유한 앱이 없습니다. 스토어에서 앱을 구매하면 여기에 표시됩니다.</div>
+      <div v-else class="bn-table-wrapper">
+        <table class="bn-lib-table">
+          <thead>
+            <tr>
+              <th>앱</th>
+              <th>버전</th>
+              <th>권한 상태</th>
+              <th>획득일</th>
+              <th>다운로드</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in enriched" :key="item.entitlement.id">
+              <td>
+                <NuxtLink :to="`/apps/${item.slug}`" class="bn-app-link">
+                  <strong>{{ item.title }}</strong>
                 </NuxtLink>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+                <div class="bn-mono-sm">{{ item.packageName }}</div>
+              </td>
+              <td>{{ item.version }}</td>
+              <td>
+                <span class="bn-status-tag" :class="item.entitlement.status === 'ACTIVE' ? 'active' : 'revoked'">
+                  {{ item.entitlement.status }}
+                </span>
+              </td>
+              <td class="bn-mono-sm">{{ item.entitlement.granted_at.slice(0, 10) }}</td>
+              <td>
+                <button
+                  class="bn-btn-secondary"
+                  :disabled="downloadingId === item.entitlement.id || !item.releaseId"
+                  @click="downloadApp(item)"
+                >
+                  {{ downloadingId === item.entitlement.id ? '발급 중…' : 'APK 다운로드' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>주문 내역</h2>
+      <div v-if="orders.length === 0" class="bn-status">주문 내역이 없습니다.</div>
+      <div v-else class="bn-table-wrapper">
+        <table class="bn-lib-table">
+          <thead>
+            <tr>
+              <th>주문 ID</th>
+              <th>앱</th>
+              <th>결제 금액</th>
+              <th>상태</th>
+              <th>주문일</th>
+              <th>환불</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="order in orders" :key="order.id">
+              <td class="bn-mono-sm">{{ order.id }}</td>
+              <td>{{ orderTitles[order.app_id] || order.app_id }}</td>
+              <td>{{ order.gross_amount.toLocaleString() }} {{ order.currency }}</td>
+              <td>
+                <span class="bn-status-tag" :class="order.status === 'PAID' ? 'active' : order.status === 'REFUNDED' ? 'revoked' : ''">
+                  {{ order.status }}
+                </span>
+              </td>
+              <td class="bn-mono-sm">{{ order.created_at.slice(0, 10) }}</td>
+              <td>
+                <button
+                  v-if="order.status === 'PAID'"
+                  class="bn-btn-secondary"
+                  @click="openRefund(order)"
+                >
+                  환불 신청
+                </button>
+                <span v-else>—</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <RefundRequestModal
+      :is-open="refundModalOpen"
+      :order-id="refundTarget?.id || ''"
+      :app-title="refundTarget ? (orderTitles[refundTarget.app_id] || refundTarget.app_id) : ''"
+      :amount-won="refundTarget?.gross_amount || 0"
+      :purchased-at="refundTarget?.created_at.slice(0, 10) || ''"
+      @close="refundModalOpen = false"
+      @refund-completed="onRefundCompleted"
+    />
+  </main>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { getSharedClient, ApiClientError, type OrderDTO, type UserEntitlement } from '@bookingnetwork/api-client';
+import RefundRequestModal from '~/components/RefundRequestModal.vue';
 
-const libraryItems = ref([
-  {
-    appId: 'app-1',
-    slug: 'secure-authenticator-2fa',
-    title: 'Secure Authenticator 2FA',
-    packageName: 'com.secure.authenticator',
-    isPaid: false,
-    price: 0,
-    acquiredDate: '2026-09-15',
-    installedVersionName: '1.2.0',
-    latestVersionName: '1.2.0',
-    updateAvailable: false
-  },
-  {
-    appId: 'app-2',
-    slug: 'pro-crypto-tracker',
-    title: 'Pro Crypto Tracker & Portfolio',
-    packageName: 'com.crypto.protracker',
-    isPaid: true,
-    price: 4900,
-    acquiredDate: '2026-10-01',
-    installedVersionName: '2.0.1',
-    latestVersionName: '2.1.0',
-    updateAvailable: true
+const api = getSharedClient();
+
+interface EnrichedItem {
+  entitlement: UserEntitlement;
+  title: string;
+  slug: string;
+  packageName: string;
+  version: string;
+  releaseId: string;
+}
+
+const isLoading = ref(true);
+const loadError = ref('');
+const needsLogin = ref(false);
+const entitlements = ref<UserEntitlement[]>([]);
+const orders = ref<OrderDTO[]>([]);
+const enriched = ref<EnrichedItem[]>([]);
+const orderTitles = ref<Record<string, string>>({});
+const downloadingId = ref('');
+
+const refundModalOpen = ref(false);
+const refundTarget = ref<OrderDTO | null>(null);
+
+function deviceId(): string {
+  if (typeof window === 'undefined') return 'ssr-device';
+  let id = localStorage.getItem('bn_device_id');
+  if (!id) {
+    id = 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('bn_device_id', id);
   }
-]);
+  return id;
+}
 
-async function downloadFreshApk(item: any) {
+async function downloadApp(item: EnrichedItem) {
+  downloadingId.value = item.entitlement.id;
   try {
-    const res = await fetch(`/api/v1/catalog/apps/${item.appId}/releases/latest/download-token`, {
-      method: 'POST'
-    });
-    if (res.ok) {
-      const { url } = await res.json();
-      window.location.href = url;
-    } else {
-      alert('Failed to generate download token. Please verify network access.');
+    const signed = await api.createDownloadToken(item.entitlement.app_id, item.releaseId, deviceId());
+    if (typeof window !== 'undefined') {
+      const a = document.createElement('a');
+      a.href = signed.url;
+      a.download = `${item.packageName}.apk`;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
-  } catch (err) {
-    console.error(err);
+  } catch {
+    loadError.value = '다운로드 URL 발급에 실패했습니다.';
+  } finally {
+    downloadingId.value = '';
   }
 }
+
+function openRefund(order: OrderDTO) {
+  refundTarget.value = order;
+  refundModalOpen.value = true;
+}
+
+function onRefundCompleted(orderId: string) {
+  refundModalOpen.value = false;
+  orders.value = orders.value.map(o => o.id === orderId ? { ...o, status: 'REFUNDED' } : o);
+}
+
+onMounted(async () => {
+  try {
+    const [ents, ords] = await Promise.all([api.listEntitlements(), api.listMyOrders()]);
+    entitlements.value = ents;
+    orders.value = ords;
+    const appIds = [...new Set([...ents.map(e => e.app_id), ...ords.map(o => o.app_id)])];
+    const titles: Record<string, string> = {};
+    const details = await Promise.all(appIds.map(async (id) => {
+      try {
+        const d = await api.getAppBySlug(id);
+        titles[id] = d.localization?.title || d.app.canonical_slug;
+        return d;
+      } catch {
+        titles[id] = id;
+        return null;
+      }
+    }));
+    orderTitles.value = titles;
+    const byId: Record<string, (typeof details)[number]> = {};
+    appIds.forEach((id, i) => { byId[id] = details[i]; });
+    enriched.value = ents.map((entitlement) => {
+      const d = byId[entitlement.app_id];
+      const dist = d?.distributions[0];
+      return {
+        entitlement,
+        title: titles[entitlement.app_id] || entitlement.app_id,
+        slug: d?.app.canonical_slug || entitlement.app_id,
+        packageName: d?.app.primary_package_name || '',
+        version: dist?.latest_release?.version_name || '—',
+        releaseId: dist?.latest_release?.id || ''
+      };
+    });
+  } catch (err) {
+    if (err instanceof ApiClientError && err.status === 401) {
+      needsLogin.value = true;
+      loadError.value = '보관함을 보려면 로그인이 필요합니다.';
+    } else {
+      loadError.value = err instanceof ApiClientError ? err.message : '보관함을 불러오지 못했습니다.';
+    }
+  } finally {
+    isLoading.value = false;
+  }
+});
 </script>
 
 <style scoped>
-.account-library-container {
+.bn-container {
   max-width: 1000px;
   margin: 0 auto;
-  padding: 32px 16px;
+  padding: 40px 16px;
 }
-.library-header {
-  margin-bottom: 24px;
+.bn-library-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
-.subtitle {
-  color: #64748b;
+.bn-library-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+.bn-sub {
+  color: var(--bn-text-muted, #64748B);
   font-size: 14px;
+  margin: 6px 0 0;
 }
-.library-stats {
+.bn-header-stats {
   display: flex;
   gap: 16px;
-  margin-bottom: 24px;
 }
-.stat-pill {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 12px 20px;
-  flex: 1;
+.bn-stat-box {
+  display: flex;
+  flex-direction: column;
 }
-.stat-pill label {
+.bn-stat-label {
   font-size: 11px;
-  text-transform: uppercase;
-  color: #64748b;
-  display: block;
-  margin-bottom: 4px;
-  font-weight: 600;
+  color: var(--bn-text-muted, #64748B);
 }
-.stat-pill .val {
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
+.bn-stat-value {
+  font-size: 16px;
 }
-.library-table-card {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 16px;
+.bn-status {
+  padding: 24px;
+  text-align: center;
+  color: var(--bn-text-muted, #64748B);
+  font-size: 14px;
 }
-.library-table {
+.bn-error-text {
+  color: #b91c1c;
+}
+.bn-table-wrapper {
+  overflow-x: auto;
+  margin-bottom: 32px;
+}
+.bn-lib-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  background-color: var(--bn-bg-surface, #fff);
+  border: 1px solid var(--bn-border-subtle, #E2E8F0);
+  border-radius: 8px;
+  font-size: 14px;
 }
-.library-table th {
+.bn-lib-table th, .bn-lib-table td {
+  padding: 12px 16px;
   text-align: left;
-  padding: 10px 12px;
-  border-bottom: 2px solid #e2e8f0;
-  color: #475569;
+  border-bottom: 1px solid var(--bn-border-subtle, #E2E8F0);
 }
-.library-table td {
-  padding: 14px 12px;
-  border-bottom: 1px solid #f1f5f9;
-  vertical-align: middle;
+.bn-lib-table th {
+  background-color: var(--bn-bg-elevated, #F8FAFC);
+  font-weight: 600;
+  color: var(--bn-text-secondary, #475569);
+  font-size: 12px;
+  text-transform: uppercase;
 }
-.app-info-cell {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.bn-app-link {
+  color: inherit;
+  text-decoration: none;
 }
-.app-icon {
-  font-size: 28px;
-  background: #f8fafc;
-  padding: 6px;
-  border-radius: 6px;
+.bn-app-link:hover {
+  text-decoration: underline;
 }
-.badge {
-  padding: 2px 8px;
-  border-radius: 12px;
+.bn-mono-sm {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--bn-text-muted, #64748B);
+  margin-top: 4px;
+}
+.bn-status-tag {
   font-size: 11px;
   font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: var(--bn-bg-elevated, #F1F5F9);
+  color: var(--bn-text-muted, #64748B);
 }
-.badge-free { background: #f1f5f9; color: #475569; }
-.badge-paid { background: #eff6ff; color: #1d4ed8; }
-.badge-warning { background: #fef3c7; color: #92400e; margin-left: 6px; }
-.date-text { color: #94a3b8; margin-top: 4px; }
-.action-buttons {
-  display: flex;
-  gap: 8px;
+.bn-status-tag.active {
+  background-color: #ECFDF5;
+  color: #059669;
 }
-.btn {
-  padding: 6px 12px;
+.bn-status-tag.revoked {
+  background-color: #FEF2F2;
+  color: #B91C1C;
+}
+.bn-btn-secondary {
+  background-color: var(--bn-bg-elevated, #F1F5F9);
+  border: 1px solid var(--bn-border-subtle, #E2E8F0);
   border-radius: 6px;
+  padding: 6px 12px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
 }
-.btn-primary { background: #2563eb; color: white; border: none; }
-.btn-outline { background: transparent; border: 1px solid #cbd5e1; color: #334155; }
-.text-warning { color: #d97706; }
-.text-muted { color: #94a3b8; }
-.text-xs { font-size: 11px; }
-.font-mono { font-family: monospace; }
+.bn-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 </style>
-

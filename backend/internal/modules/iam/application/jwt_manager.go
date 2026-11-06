@@ -3,7 +3,9 @@ package application
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"math/big"
@@ -28,6 +30,31 @@ type JWTManager struct {
 	keyID      string
 	issuer     string
 	ttl        time.Duration
+}
+
+// ParseRSAPrivateKeyPEM decodes a PKCS#1 ("RSA PRIVATE KEY") or PKCS#8
+// ("PRIVATE KEY") PEM block into an RSA signing key.
+func ParseRSAPrivateKeyPEM(pemBytes []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return nil, errors.New("no PEM block found in JWT private key")
+	}
+	if block.Type == "RSA PRIVATE KEY" {
+		key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse PKCS#1 private key: %w", err)
+		}
+		return key, nil
+	}
+	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse PKCS#8 private key: %w", err)
+	}
+	key, ok := parsed.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("PKCS#8 key is not an RSA private key")
+	}
+	return key, nil
 }
 
 func NewJWTManager(privateKey *rsa.PrivateKey, issuer string) (*JWTManager, error) {

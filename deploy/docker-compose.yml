@@ -91,6 +91,7 @@ services:
     environment:
       DATABASE_URL: postgres://bn_app:${POSTGRES_PASSWORD:-bn_secure_password_2026}@postgres:5432/bn_appmarket?sslmode=disable
       MIGRATIONS_DIR: /app/db/migrations
+      IAM_HMAC_SECRET: ${IAM_HMAC_SECRET:-dev-only-hmac-secret-change-in-production-32}
     depends_on:
       postgres: {condition: service_healthy}
     networks: [data]
@@ -107,6 +108,31 @@ services:
       ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-https://appmarket.dnjstjqppk.workers.dev}
       TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      IAM_HMAC_SECRET: ${IAM_HMAC_SECRET:?IAM_HMAC_SECRET is required}
+      DISTRIBUTION_TOKEN_SECRET: ${DISTRIBUTION_TOKEN_SECRET:?DISTRIBUTION_TOKEN_SECRET is required}
+      PG_WEBHOOK_SECRET: ${PG_WEBHOOK_SECRET:?PG_WEBHOOK_SECRET is required}
+      PAYOUT_ENC_KEY: ${PAYOUT_ENC_KEY:?PAYOUT_ENC_KEY is required}
+      MEDIA_BUCKET: ${MEDIA_BUCKET:-bn-public-media}
+      JWT_ISSUER: ${JWT_ISSUER:-https://auth.appmarket.local}
+      JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}
+      CDN_DOMAIN: ${CDN_DOMAIN:-cdn.appmarket.local}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://appmarket.bookingnetwork.internal}
+      PG_PROVIDER: ${PG_PROVIDER:-toss}
+      TOSS_SECRET_KEY: ${TOSS_SECRET_KEY:-}
+      PORTONE_API_KEY: ${PORTONE_API_KEY:-}
+      PORTONE_STORE_ID: ${PORTONE_STORE_ID:-}
+      PG_IS_LIVE: ${PG_IS_LIVE:-false}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      APP_ENV: ${APP_ENV:-development}
+      OAUTH_REDIRECT_BASE_URL: ${OAUTH_REDIRECT_BASE_URL:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      APPLE_TEAM_ID: ${APPLE_TEAM_ID:-}
+      APPLE_KEY_ID: ${APPLE_KEY_ID:-}
+      APPLE_PRIVATE_KEY_PEM: ${APPLE_PRIVATE_KEY_PEM:-}
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
@@ -118,6 +144,12 @@ services:
     read_only: true
     cap_drop: [ALL]
     security_opt: ['no-new-privileges:true']
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O- http://localhost:8080/healthz/ready >/dev/null']
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
     networks: [data]
 
   otel-collector:

@@ -10,6 +10,23 @@ import (
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/catalog/domain"
 )
 
+func TestCatalogDetailResolvesByID(t *testing.T) {
+	svc, repo, _ := setupCatalog(t)
+	seedApp(repo, "byid", "en-US", []domain.Localization{{ID: "l1", AppID: "app-byid", Locale: "en-US", Title: "ByID App"}}, nil)
+
+	detail, err := svc.GetAppDetail(context.Background(), "app-byid", "en-US")
+	if err != nil {
+		t.Fatalf("expected ID fallback to resolve, got %v", err)
+	}
+	if detail.App.CanonicalSlug != "byid" {
+		t.Fatalf("expected slug byid, got %s", detail.App.CanonicalSlug)
+	}
+
+	if _, err := svc.GetAppDetail(context.Background(), "no-such-app", "en-US"); err != domain.ErrAppNotFound {
+		t.Fatalf("expected ErrAppNotFound, got %v", err)
+	}
+}
+
 func TestCatalogSignatureGroupSeparation(t *testing.T) {
 	svc, repo, _ := setupCatalog(t)
 	locs := []domain.Localization{{ID: "l1", AppID: "app-sig", Locale: "en-US", Title: "Sig App"}}

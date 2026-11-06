@@ -22,6 +22,7 @@ type AuditLogRecord struct {
 	IPAddress  string    `json:"ip_address"`
 	UserAgent  string    `json:"user_agent"`
 	CreatedAt  time.Time `json:"created_at"`
+	Nano       int64     `json:"created_at_nano,string"`
 	PrevHash   string    `json:"prev_hash"`
 	RecordHash string    `json:"record_hash"`
 }
@@ -113,6 +114,7 @@ func (l *HashChainLogger) Log(actorID, action, targetType, targetID, diffJSON, i
 
 	now := time.Now().UTC()
 	recordHash := ComputeRecordHash(prevHash, actorID, action, targetType, targetID, diffJSON, now)
+	nano := now.UnixNano()
 
 	record := &AuditLogRecord{
 		ID:         uuid.New().String(),
@@ -124,6 +126,7 @@ func (l *HashChainLogger) Log(actorID, action, targetType, targetID, diffJSON, i
 		IPAddress:  ipAddress,
 		UserAgent:  userAgent,
 		CreatedAt:  now,
+		Nano:       nano,
 		PrevHash:   prevHash,
 		RecordHash: recordHash,
 	}

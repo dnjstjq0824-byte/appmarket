@@ -54,6 +54,41 @@ func (r *mockCatalogRepo) GetAppBySlug(ctx context.Context, slug string) (*domai
 	cp := *a
 	return &cp, nil
 }
+func (r *mockCatalogRepo) GetAppByID(ctx context.Context, appID string) (*domain.CatalogApp, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	a, ok := r.byID[appID]
+	if !ok {
+		return nil, domain.ErrAppNotFound
+	}
+	cp := *a
+	return &cp, nil
+}
+func (r *mockCatalogRepo) UpdateCatalogStatus(ctx context.Context, appID string, status domain.CatalogStatus) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	a, ok := r.byID[appID]
+	if !ok {
+		return domain.ErrAppNotFound
+	}
+	a.CatalogStatus = status
+	return nil
+}
+func (r *mockCatalogRepo) ListAppsByStatus(ctx context.Context, statuses []domain.CatalogStatus) ([]domain.CatalogApp, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	want := make(map[domain.CatalogStatus]bool, len(statuses))
+	for _, s := range statuses {
+		want[s] = true
+	}
+	var out []domain.CatalogApp
+	for _, a := range r.byID {
+		if want[a.CatalogStatus] {
+			out = append(out, *a)
+		}
+	}
+	return out, nil
+}
 func (r *mockCatalogRepo) GetLocalizations(ctx context.Context, appID string) ([]domain.Localization, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -71,6 +106,28 @@ func (r *mockCatalogRepo) GetMediaAssets(ctx context.Context, appID, locale stri
 		}
 	}
 	return out, nil
+}
+func (r *mockCatalogRepo) AddMediaAsset(ctx context.Context, asset domain.MediaAsset) (*domain.MediaAsset, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if asset.ID == "" {
+		asset.ID = "media-test-1"
+	}
+	r.media[asset.AppID] = append(r.media[asset.AppID], asset)
+	cp := asset
+	return &cp, nil
+}
+func (r *mockCatalogRepo) DeleteMediaAsset(ctx context.Context, appID, assetID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	list := r.media[appID]
+	for i := range list {
+		if list[i].ID == assetID {
+			r.media[appID] = append(list[:i], list[i+1:]...)
+			return nil
+		}
+	}
+	return domain.ErrMediaAssetNotFound
 }
 func (r *mockCatalogRepo) GetDistributions(ctx context.Context, appID string) ([]domain.Distribution, error) {
 	r.mu.RLock()
@@ -98,6 +155,25 @@ func (r *mockCatalogRepo) GetTags(ctx context.Context, appID string) ([]domain.T
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.tags[appID], nil
+}
+
+func (r *mockCatalogRepo) ListAppsByOrg(ctx context.Context, orgID string) ([]domain.CatalogApp, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var out []domain.CatalogApp
+	for _, a := range r.byID {
+		if a.DeveloperOrgID != nil && *a.DeveloperOrgID == orgID {
+			out = append(out, *a)
+		}
+	}
+	return out, nil
+}
+func (r *mockCatalogRepo) UpsertLocalization(ctx context.Context, loc domain.Localization) (*domain.Localization, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.locs[loc.AppID] = append(r.locs[loc.AppID], loc)
+	cp := loc
+	return &cp, nil
 }
 
 type mockCache struct {

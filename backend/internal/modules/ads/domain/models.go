@@ -11,6 +11,9 @@ var (
 	ErrClickFraudFastBot        = errors.New("ERR_CLICK_FRAUD_BOT_FAST_CLICK")
 	ErrImpressionTokenExpired   = errors.New("ERR_IMPRESSION_TOKEN_EXPIRED")
 	ErrDailyBudgetCapReached    = errors.New("ERR_DAILY_BUDGET_CAP_REACHED")
+	ErrInvalidCampaign        = errors.New("ERR_INVALID_CAMPAIGN")
+	ErrCampaignAccessDenied   = errors.New("ERR_CAMPAIGN_ACCESS_DENIED")
+	ErrCampaignNotReviewable  = errors.New("ERR_CAMPAIGN_NOT_REVIEWABLE")
 )
 
 type CampaignStatus string
@@ -19,6 +22,8 @@ const (
 	CampaignActive               CampaignStatus = "ACTIVE"
 	CampaignPausedBudgetCap      CampaignStatus = "PAUSED_DAILY_BUDGET_CAP"
 	CampaignPausedManual         CampaignStatus = "PAUSED_MANUAL"
+	CampaignPendingReview        CampaignStatus = "PENDING_REVIEW"
+	CampaignRejected             CampaignStatus = "REJECTED"
 )
 
 type AdCampaign struct {

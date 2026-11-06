@@ -34,6 +34,9 @@ var (
 	ErrOrgNotVerified       = errors.New("ERR_DEV_ORG_NOT_VERIFIED: organization is not verified")
 	ErrForbiddenTenantAccess = errors.New("ERR_FORBIDDEN_TENANT_ACCESS: forbidden tenant access")
 	ErrMemberNotFound       = errors.New("member not found")
+	ErrLastOwnerRemoval     = errors.New("cannot remove the last owner")
+	ErrPayoutAccountNotFound = errors.New("payout account not found")
+	ErrVerificationNotFound = errors.New("verification not found")
 	ErrAPIKeyNotFound       = errors.New("api key not found")
 	ErrInvalidOrgSlug       = errors.New("invalid org slug")
 	ErrDuplicateOrgSlug     = errors.New("org slug already exists")
@@ -58,7 +61,10 @@ type DeveloperVerification struct {
 	DocURL      string    `json:"doc_url"`
 	Domain      string    `json:"domain"`
 	Status      string    `json:"status"`
-	SubmittedAt time.Time `json:"submitted_at"`
+	SubmittedAt time.Time  `json:"submitted_at"`
+	ReviewerID  string     `json:"reviewer_id,omitempty"`
+	ReviewNotes string     `json:"review_notes,omitempty"`
+	ReviewedAt  *time.Time `json:"reviewed_at,omitempty"`
 }
 
 // OrgMember represents membership.
@@ -66,6 +72,31 @@ type OrgMember struct {
 	OrgID  string  `json:"org_id"`
 	UserID string  `json:"user_id"`
 	Role   DevRole `json:"role"`
+}
+
+// PayoutAccount is the API-safe masked view of a payout account.
+type PayoutAccount struct {
+	OrgID         string `json:"org_id"`
+	Currency      string `json:"currency"`
+	BankName      string `json:"bank_name"`
+	HolderName    string `json:"holder_name"`
+	AccountLast4  string `json:"account_last4"`
+	RoutingCode   string `json:"routing_code,omitempty"`
+	IsVerified    bool   `json:"is_verified"`
+	AccountNumber string `json:"-"`
+}
+
+// PayoutRecord is the encrypted persistence shape. Ciphertext holds a
+// nonce-prefixed AES-256-GCM envelope over the account number.
+type PayoutRecord struct {
+	OrgID       string
+	Currency    string
+	BankName    string
+	HolderName  string
+	RoutingCode string
+	Last4       string
+	Ciphertext  []byte
+	IsVerified  bool
 }
 
 // APIKey represents a scoped CI/CD key (hash stored).
@@ -102,7 +133,7 @@ func (k APIKey) IsValid(now time.Time) bool {
 // Permission matrix: role -> allowed scopes/actions.
 var RolePermissions = map[DevRole]map[string]bool{
 	RoleDevOwner: {
-		"org:manage": true, "member:invite": true, "app:create": true,
+		"org:manage": true, "member:invite": true, "member:remove": true, "app:create": true,
 		"release:upload": true, "release:submit": true, "listing:edit": true,
 		"finance:view": true, "review:reply": true,
 	},

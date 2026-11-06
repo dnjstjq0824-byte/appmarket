@@ -1,250 +1,347 @@
 <template>
-  <div class="settlement-payout-admin-view p-6 bg-slate-900 text-slate-100 min-h-screen">
-    <header class="mb-8">
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-2xl font-bold tracking-tight">월간 개발자 정산 및 이중승인(Dual-Control) 지급 집행 (ADM-14)</h1>
-          <p class="text-sm text-slate-400 mt-1">14일 에스크로 성숙 완료 정산 집행, 15%/10% 플랫폼 수수료 및 2인 관리자 교차 승인</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="px-3 py-1 bg-sky-950/80 border border-sky-500/40 text-sky-400 text-xs rounded-full font-mono">
-            현재 로그인 관리자: {{ currentAdminId }}
-          </span>
-        </div>
+  <div class="settlement-payout-admin-view">
+    <header class="view-header">
+      <div>
+        <h1>월간 개발자 정산 및 이중승인 지급 집행 (ADM-14)</h1>
+        <p class="subtitle">정산 요청 생성과 2인 관리자 교차 승인 (Four-Eyes Principle)</p>
       </div>
+      <span class="admin-pill">현재 로그인 관리자: {{ currentAdminId }}</span>
     </header>
 
-    <!-- Settlement Overview Metrics -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-slate-800/80 border border-slate-700 p-4 rounded-lg">
-        <span class="text-xs text-slate-400">이번 달 정산 대상 총액</span>
-        <div class="text-2xl font-bold mt-1 text-slate-200">₩{{ totalGrossSales.toLocaleString() }}</div>
+    <div class="summary-grid">
+      <div class="summary-card">
+        <span class="summary-label">지급 요청 총액</span>
+        <div class="summary-value">₩{{ totalRequested.toLocaleString() }}</div>
       </div>
-      <div class="bg-slate-800/80 border border-slate-700 p-4 rounded-lg">
-        <span class="text-xs text-slate-400">플랫폼 수수료 매출 (15%/10%)</span>
-        <div class="text-2xl font-bold mt-1 text-emerald-400">₩{{ totalCommission.toLocaleString() }}</div>
+      <div class="summary-card">
+        <span class="summary-label">지급 완료</span>
+        <div class="summary-value text-success">₩{{ totalPaid.toLocaleString() }}</div>
       </div>
-      <div class="bg-slate-800/80 border border-slate-700 p-4 rounded-lg">
-        <span class="text-xs text-slate-400">개발자 지급 예정액</span>
-        <div class="text-2xl font-bold mt-1 text-sky-400">₩{{ totalDevPayout.toLocaleString() }}</div>
-      </div>
-      <div class="bg-slate-800/80 border border-slate-700 p-4 rounded-lg">
-        <span class="text-xs text-slate-400">2차 승인 대기 건</span>
-        <div class="text-2xl font-bold mt-1 text-amber-400">{{ pendingSecondApprovalCount }}건</div>
+      <div class="summary-card">
+        <span class="summary-label">승인 대기 건</span>
+        <div class="summary-value text-amber">{{ pendingCount }}건</div>
       </div>
     </div>
 
-    <!-- Settlements Table -->
-    <div class="bg-slate-800/90 border border-slate-700 rounded-lg overflow-hidden">
-      <div class="p-4 border-b border-slate-700 flex justify-between items-center">
-        <h2 class="text-base font-semibold text-slate-200">개발자 조직별 월간 정산 내역 및 2인 이중승인 현황</h2>
+    <form class="create-card" @submit.prevent="createPayout">
+      <h3>새 정산 지급 요청</h3>
+      <div class="form-grid">
+        <label>조직 ID <input v-model="form.orgId" required placeholder="org-..." /></label>
+        <label>금액 (minor) <input v-model.number="form.amount" type="number" min="1" required /></label>
+        <label>통화 <input v-model="form.currency" maxlength="3" placeholder="KRW" /></label>
       </div>
+      <button type="submit" class="btn btn-primary btn-sm" :disabled="isActing">
+        {{ isActing ? '생성 중…' : '지급 요청 생성' }}
+      </button>
+    </form>
 
-      <table class="w-full text-left text-sm text-slate-300">
-        <thead class="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-700">
+    <div v-if="isLoading" class="loading-row">불러오는 중…</div>
+    <div v-if="loadError" class="load-error">{{ loadError }}</div>
+    <div v-if="actionError" class="load-error">{{ actionError }}</div>
+
+    <div v-if="!isLoading && !loadError" class="list-card">
+      <div v-if="payouts.length === 0" class="empty-row">지급 요청이 없습니다.</div>
+      <table v-else class="payout-table">
+        <thead>
           <tr>
-            <th class="p-3">정산 ID / 정산월</th>
-            <th class="p-3">개발사 / 사업자번호</th>
-            <th class="p-3">총 결제액 (Gross)</th>
-            <th class="p-3">수수료 / 부가세</th>
-            <th class="p-3">실 지급액 (Net Payout)</th>
-            <th class="p-3">14일 에스크로 상태</th>
-            <th class="p-3">승인 진행 단계</th>
-            <th class="p-3 text-right">승인/집행</th>
+            <th>정산 ID</th>
+            <th>조직</th>
+            <th>금액</th>
+            <th>상태</th>
+            <th>요청자 → 승인자</th>
+            <th>승인/집행</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-700/60">
-          <tr v-for="s in settlements" :key="s.id" class="hover:bg-slate-750 transition">
-            <td class="p-3 font-mono text-xs">
-              <div class="font-bold text-sky-400">{{ s.id }}</div>
-              <div class="text-slate-400">{{ s.billingMonth }}</div>
-            </td>
-            <td class="p-3 text-xs">
-              <div class="text-slate-200 font-semibold">{{ s.orgName }}</div>
-              <div class="font-mono text-slate-400 text-[11px]">{{ s.businessNumber }}</div>
-            </td>
-            <td class="p-3 text-xs font-mono">
-              ₩{{ s.grossSalesWon.toLocaleString() }}
-            </td>
-            <td class="p-3 text-xs font-mono">
-              <div>수수료: ₩{{ s.commissionWon.toLocaleString() }}</div>
-              <div class="text-slate-400">VAT: ₩{{ s.vatWon.toLocaleString() }}</div>
-            </td>
-            <td class="p-3 text-xs font-mono font-bold text-emerald-400">
-              ₩{{ s.netPayoutWon.toLocaleString() }}
-            </td>
-            <td class="p-3 text-xs font-mono">
-              <span :class="s.escrowMatured ? 'text-emerald-400' : 'text-amber-400'">
-                {{ s.escrowMatured ? '성숙 완료 (출금 가능)' : '에스크로 보호 중' }}
-              </span>
-            </td>
-            <td class="p-3 text-xs">
-              <div class="space-y-1">
-                <div class="text-[11px] flex items-center gap-1">
-                  <span :class="s.firstApprover ? 'text-emerald-400' : 'text-slate-500'">●</span>
-                  1차: {{ s.firstApprover || '대기 중' }}
-                </div>
-                <div class="text-[11px] flex items-center gap-1">
-                  <span :class="s.secondApprover ? 'text-emerald-400' : 'text-slate-500'">●</span>
-                  2차: {{ s.secondApprover || '대기 중' }}
-                </div>
-              </div>
-            </td>
-            <td class="p-3 text-right text-xs">
-              <!-- Step 1 Approval -->
-              <button 
-                v-if="!s.firstApprover"
-                @click="approveFirst(s)"
-                :disabled="!s.escrowMatured || s.complianceHold"
-                class="px-2.5 py-1 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded font-medium text-xs transition"
+        <tbody>
+          <tr v-for="p in payouts" :key="p.id">
+            <td class="mono"><div class="payout-id">{{ p.id }}</div><div class="muted">{{ p.created_at }}</div></td>
+            <td class="mono muted">{{ p.org_id }}</td>
+            <td class="mono">₩{{ Number(p.amount).toLocaleString() }} {{ p.currency }}</td>
+            <td><span class="badge" :class="p.status === 'PAID_COMPLETED' ? 'badge-success' : 'badge-pending'">{{ p.status }}</span></td>
+            <td class="mono text-xs">{{ p.created_by }} → {{ p.approved_by || '대기 중' }}</td>
+            <td>
+              <button
+                v-if="p.status === 'PENDING_APPROVAL'"
+                @click="approve(p)"
+                :disabled="isActing || p.created_by === currentAdminId"
+                class="btn btn-success btn-xs"
+                :title="p.created_by === currentAdminId ? '동일인 2차 승인 불가 (Self-Approval Prohibited)' : '최종 지급 집행'"
               >
-                1차 승인
+                최종 지급 승인
               </button>
-
-              <!-- Step 2 Final Approval (Dual Control: Must NOT be the same as 1st approver!) -->
-              <button 
-                v-else-if="s.firstApprover && !s.secondApprover"
-                @click="approveSecond(s)"
-                :disabled="s.firstApprover === currentAdminId"
-                class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded font-medium text-xs transition"
-                :title="s.firstApprover === currentAdminId ? '동일인 2차 승인 불가 (Self-Approval Prohibited)' : '최종 지급 집행'"
-              >
-                2차 최종 지급
-              </button>
-
-              <span v-else class="text-emerald-400 font-mono font-bold text-xs">
-                지급 완료
-              </span>
+              <span v-else class="text-success mono text-xs">지급 완료</span>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Error Banner for Self-Approval Attempt -->
-    <div v-if="selfApprovalError" class="fixed bottom-6 right-6 bg-rose-900 border border-rose-600 text-rose-100 p-4 rounded-lg shadow-xl text-xs max-w-md">
-      <div class="font-bold text-sm mb-1">이중 승인 위반 방지</div>
-      <div>1차 승인자와 동일한 관리자는 2차 최종 지급을 승인할 수 없습니다. (TC-COM-006 준수)</div>
-      <button @click="selfApprovalError = false" class="mt-2 px-2 py-1 bg-rose-700 hover:bg-rose-600 rounded text-white text-[11px]">확인</button>
+    <div v-if="selfApprovalError" class="error-toast">
+      <div class="error-title">이중 승인 위반 방지</div>
+      <div>요청자와 동일한 관리자는 최종 지급을 승인할 수 없습니다.</div>
+      <button @click="selfApprovalError = false" class="btn btn-danger btn-xs toast-btn">확인</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { getSharedClient, ApiClientError } from '@bookingnetwork/api-client';
 
-interface SettlementItem {
+const api = getSharedClient();
+
+interface Payout {
   id: string;
-  billingMonth: string;
-  orgName: string;
-  businessNumber: string;
-  grossSalesWon: number;
-  commissionWon: number;
-  vatWon: number;
-  netPayoutWon: number;
-  escrowMatured: boolean;
-  complianceHold: boolean;
-  firstApprover?: string;
-  secondApprover?: string;
+  org_id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  created_by: string;
+  approved_by?: string;
+  created_at: string;
+  approved_at?: string;
 }
 
-const currentAdminId = ref('admin_finance_02');
+const currentAdminId = ref('');
+const payouts = ref<Payout[]>([]);
+const form = ref({ orgId: '', amount: 0, currency: 'KRW' });
 const selfApprovalError = ref(false);
+const isLoading = ref(true);
+const loadError = ref('');
+const actionError = ref('');
+const isActing = ref(false);
 
-if (typeof window !== 'undefined') {
-  const saved = localStorage.getItem('bn_admin_profile');
-  if (saved) {
-    try {
-      const p = JSON.parse(saved);
-      if (p.id) currentAdminId.value = p.id;
-    } catch { /* default */ }
-  }
-}
+const totalRequested = computed(() => payouts.value.reduce((n, p) => n + Number(p.amount || 0), 0));
+const totalPaid = computed(() => payouts.value.filter(p => p.status === 'PAID_COMPLETED').reduce((n, p) => n + Number(p.amount || 0), 0));
+const pendingCount = computed(() => payouts.value.filter(p => p.status === 'PENDING_APPROVAL').length);
 
-const settlements = ref<SettlementItem[]>([
-  {
-    id: 'stl-202610-001',
-    billingMonth: '2026-10',
-    orgName: 'OmniWork Corp',
-    businessNumber: '120-81-12345',
-    grossSalesWon: 11000000,
-    commissionWon: 1650000, // Exact 15%
-    vatWon: 935000,
-    netPayoutWon: 8415000,
-    escrowMatured: true,
-    complianceHold: false,
-    firstApprover: 'admin_sec_01',
-    secondApprover: undefined
-  },
-  {
-    id: 'stl-202610-002',
-    billingMonth: '2026-10',
-    orgName: 'Creative Labs',
-    businessNumber: '214-82-67890',
-    grossSalesWon: 5500000,
-    commissionWon: 825000, // Exact 15%
-    vatWon: 467500,
-    netPayoutWon: 4207500,
-    escrowMatured: true,
-    complianceHold: false,
-    firstApprover: undefined,
-    secondApprover: undefined
-  },
-  {
-    id: 'stl-202610-003',
-    billingMonth: '2026-10',
-    orgName: 'ZeroTrust Security',
-    businessNumber: '107-86-54321',
-    grossSalesWon: 22000000,
-    commissionWon: 3300000, // Exact 15%
-    vatWon: 1870000,
-    netPayoutWon: 16830000,
-    escrowMatured: false, // In 14-day escrow hold
-    complianceHold: false,
-    firstApprover: undefined,
-    secondApprover: undefined
-  }
-]);
-
-const totalGrossSales = computed(() => settlements.value.reduce((sum, s) => sum + s.grossSalesWon, 0));
-const totalCommission = computed(() => settlements.value.reduce((sum, s) => sum + s.commissionWon, 0));
-const totalDevPayout = computed(() => settlements.value.reduce((sum, s) => sum + s.netPayoutWon, 0));
-const pendingSecondApprovalCount = computed(() => settlements.value.filter(s => s.firstApprover && !s.secondApprover).length);
-
-async function approveFirst(s: SettlementItem) {
-  s.firstApprover = currentAdminId.value;
-}
-
-async function approveSecond(s: SettlementItem) {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('bn_admin_token') : '';
+onMounted(async () => {
   try {
-    const res = await fetch(`/api/v1/admin/settlements/${s.id}/approve`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token || 'token_admin_finance_02'}`
-      },
-      body: JSON.stringify({
-        approver_id: currentAdminId.value,
-        initiator_id: s.firstApprover
-      })
-    });
-
-    if (res.status === 403 || s.firstApprover === currentAdminId.value) {
-      selfApprovalError.value = true;
-      return;
-    }
-
-    if (res.ok) {
-      s.secondApprover = currentAdminId.value;
-    }
+    const me = await api.getMe();
+    currentAdminId.value = me.sub || me.email || '';
   } catch {
-    if (s.firstApprover === currentAdminId.value) {
+    currentAdminId.value = '';
+  }
+  await loadPayouts();
+  isLoading.value = false;
+});
+
+async function loadPayouts() {
+  loadError.value = '';
+  try {
+    payouts.value = await api.listSettlements() as Payout[];
+  } catch (err) {
+    loadError.value = err instanceof ApiClientError ? err.message : 'Failed to load payouts';
+  }
+}
+
+async function createPayout() {
+  isActing.value = true;
+  actionError.value = '';
+  try {
+    await api.createSettlement({
+      orgId: form.value.orgId.trim(),
+      amount: form.value.amount,
+      currency: form.value.currency.trim().toUpperCase() || 'KRW'
+    });
+    form.value = { orgId: '', amount: 0, currency: 'KRW' };
+    await loadPayouts();
+  } catch (err) {
+    actionError.value = err instanceof ApiClientError ? err.message : 'Failed to create payout';
+  } finally {
+    isActing.value = false;
+  }
+}
+
+async function approve(p: Payout) {
+  if (p.created_by === currentAdminId.value) {
+    selfApprovalError.value = true;
+    return;
+  }
+  isActing.value = true;
+  actionError.value = '';
+  try {
+    await api.approveSettlement(p.id, currentAdminId.value, p.created_by);
+    await loadPayouts();
+  } catch (err) {
+    if (err instanceof ApiClientError && (err.status === 403 || /self|dual|four-eyes/i.test(err.message))) {
       selfApprovalError.value = true;
     } else {
-      s.secondApprover = currentAdminId.value;
+      actionError.value = err instanceof ApiClientError ? err.message : 'Failed to approve payout';
     }
+  } finally {
+    isActing.value = false;
   }
 }
 </script>
 
+<style scoped>
+.settlement-payout-admin-view {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.view-header h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+.subtitle {
+  color: #64748b;
+  font-size: 14px;
+  margin: 0;
+}
+.admin-pill {
+  padding: 6px 14px;
+  background: #e0e7ff;
+  color: #3730a3;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.summary-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+.summary-label {
+  font-size: 12px;
+  color: #64748b;
+  display: block;
+  margin-bottom: 6px;
+}
+.summary-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.text-success { color: #16a34a; }
+.text-amber { color: #d97706; }
+.create-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+.create-card h3 { margin: 0 0 12px; }
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+.form-grid input {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 400;
+}
+.loading-row {
+  padding: 16px;
+  color: #64748b;
+  font-size: 14px;
+}
+.load-error {
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.empty-row {
+  padding: 24px;
+  color: #64748b;
+  font-size: 14px;
+  text-align: center;
+}
+.list-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+}
+.payout-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.payout-table th {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 2px solid #e2e8f0;
+  color: #475569;
+  white-space: nowrap;
+}
+.payout-table td {
+  padding: 12px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+.mono { font-family: ui-monospace, monospace; font-size: 12px; }
+.muted { color: #64748b; }
+.text-xs { font-size: 11px; }
+.payout-id { font-weight: 700; color: #1d4ed8; }
+.badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-success { background: #dcfce7; color: #166534; }
+.badge-pending { background: #fef3c7; color: #92400e; }
+.btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  font-weight: 600;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: #2563eb; color: white; }
+.btn-success { background: #16a34a; color: white; }
+.btn-danger { background: #dc2626; color: white; }
+.btn-xs { font-size: 11px; padding: 4px 10px; }
+.btn-sm { font-size: 12px; }
+.error-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #7f1d1d;
+  border: 1px solid #dc2626;
+  color: #fee2e2;
+  padding: 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  max-width: 360px;
+}
+.error-title { font-weight: 700; margin-bottom: 4px; }
+.toast-btn { margin-top: 8px; }
+</style>

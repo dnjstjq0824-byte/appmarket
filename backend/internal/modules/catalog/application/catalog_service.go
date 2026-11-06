@@ -3,12 +3,14 @@ package application
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/microcosm-cc/bluemonday"
+	"github.com/bookingnetwork/appmarket/backend/internal/platform/sanitize"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/catalog/domain"
@@ -18,7 +20,6 @@ import (
 type CatalogService struct {
 	repo     CatalogRepository
 	cache    Cache
-	policy   *bluemonday.Policy
 	sfGroup  singleflight.Group
 	cacheTTL int
 }
@@ -28,14 +29,13 @@ func NewCatalogService(repo CatalogRepository, cache Cache) *CatalogService {
 	return &CatalogService{
 		repo:     repo,
 		cache:    cache,
-		policy:   bluemonday.StrictPolicy(),
 		cacheTTL: 300,
 	}
 }
 
-// SanitizeHTML sanitizes untrusted HTML using bluemonday StrictPolicy.
+// SanitizeHTML strips untrusted markup via the platform sanitize policy.
 func (s *CatalogService) SanitizeHTML(input string) string {
-	return s.policy.Sanitize(input)
+	return sanitize.Strict(input)
 }
 
 // LocaleFallbackChain returns the ordered list of locales to try.
@@ -111,6 +111,183 @@ func (s *CatalogService) ListApps(ctx context.Context, filter domain.AppListFilt
 	return summaries, cursor, nil
 }
 
+// LatestRelease returns the newest published release across an app's
+// distributions, or ErrAppNotFound when none is published yet.
+func (s *CatalogService) LatestRelease(ctx context.Context, appID string) (*domain.Release, error) {
+	dists, err := s.repo.GetDistributions(ctx, appID)
+	if err != nil {
+		return nil, err
+	}
+	var latest *domain.Release
+	for _, d := range dists {
+		rel, err := s.repo.GetLatestRelease(ctx, d.ID)
+		if err != nil || rel == nil {
+			continue
+		}
+		if latest == nil || rel.VersionCode > latest.VersionCode {
+			cp := *rel
+			latest = &cp
+		}
+	}
+	if latest == nil {
+		return nil, domain.ErrAppNotFound
+	}
+	return latest, nil
+}
+
+// ListLocalizations returns every locale stored for an app.
+func (s *CatalogService) ListLocalizations(ctx context.Context, appID string) ([]domain.Localization, error) {
+	return s.repo.GetLocalizations(ctx, appID)
+}
+
+// ListAppsByOrg returns every app owned by a developer org, any status.
+func (s *CatalogService) ListAppsByOrg(ctx context.Context, orgID string) ([]domain.CatalogApp, error) {
+	return s.repo.ListAppsByOrg(ctx, orgID)
+}
+
+// SaveLocalization validates, sanitizes, and persists one locale's metadata.
+func (s *CatalogService) SaveLocalization(ctx context.Context, loc domain.Localization) (*domain.Localization, error) {
+	if loc.AppID == "" || loc.Locale == "" || strings.TrimSpace(loc.Title) == "" {
+		return nil, fmt.Errorf("app_id, locale and title are required")
+	}
+	loc.Title = s.SanitizeHTML(loc.Title)
+	loc.ShortDescription = s.SanitizeHTML(loc.ShortDescription)
+	loc.FullDescription = s.SanitizeHTML(loc.FullDescription)
+	loc.WhatsNew = s.SanitizeHTML(loc.WhatsNew)
+	return s.repo.UpsertLocalization(ctx, loc)
+}
+
+// SaveMediaAsset validates and persists a store-listing media asset.
+func (s *CatalogService) SaveMediaAsset(ctx context.Context, asset domain.MediaAsset) (*domain.MediaAsset, error) {
+	if err := validateMediaAsset(asset); err != nil {
+		return nil, err
+	}
+	asset.URL = sanitize.Strict(strings.TrimSpace(asset.URL))
+	return s.repo.AddMediaAsset(ctx, asset)
+}
+
+// ListMediaAssets returns media assets for an app, optionally filtered by locale.
+func (s *CatalogService) ListMediaAssets(ctx context.Context, appID, locale string) ([]domain.MediaAsset, error) {
+	assets, err := s.repo.GetMediaAssets(ctx, appID, locale)
+	if err != nil {
+		return nil, err
+	}
+	if assets == nil {
+		return []domain.MediaAsset{}, nil
+	}
+	return assets, nil
+}
+
+// DeleteMediaAsset removes a media asset.
+func (s *CatalogService) DeleteMediaAsset(ctx context.Context, appID, assetID string) error {
+	if strings.TrimSpace(appID) == "" || strings.TrimSpace(assetID) == "" {
+		return fmt.Errorf("app_id and asset_id are required")
+	}
+	return s.repo.DeleteMediaAsset(ctx, appID, assetID)
+}
+
+// ApplyReviewDecision moves an app to PUBLISHED (approved) or back to DRAFT
+// (rejected) after verifying the app exists.
+func (s *CatalogService) ApplyReviewDecision(ctx context.Context, appID string, approved bool) error {
+	if _, err := s.repo.GetAppByID(ctx, appID); err != nil {
+		return err
+	}
+	status := domain.CatalogStatusDraft
+	if approved {
+		status = domain.CatalogStatusPublished
+	}
+	return s.repo.UpdateCatalogStatus(ctx, appID, status)
+}
+
+// SubmitForReview moves a DRAFT app into the review queue.
+func (s *CatalogService) SubmitForReview(ctx context.Context, appID string) error {
+	app, err := s.repo.GetAppByID(ctx, appID)
+	if err != nil {
+		return err
+	}
+	if app.CatalogStatus != domain.CatalogStatusDraft && app.CatalogStatus != domain.CatalogStatusUnlisted {
+		return fmt.Errorf("only DRAFT or UNLISTED apps can be submitted for review")
+	}
+	return s.repo.UpdateCatalogStatus(ctx, appID, domain.CatalogStatusPendingInitialReview)
+}
+
+// GetAppByID returns the catalog app with the given ID.
+func (s *CatalogService) GetAppByID(ctx context.Context, appID string) (*domain.CatalogApp, error) {
+	return s.repo.GetAppByID(ctx, appID)
+}
+
+// ListReviewQueue returns apps awaiting initial review.
+func (s *CatalogService) ListReviewQueue(ctx context.Context) ([]domain.CatalogApp, error) {
+	apps, err := s.repo.ListAppsByStatus(ctx, []domain.CatalogStatus{domain.CatalogStatusPendingInitialReview})
+	if err != nil {
+		return nil, err
+	}
+	if apps == nil {
+		return []domain.CatalogApp{}, nil
+	}
+	return apps, nil
+}
+
+func validateMediaAsset(asset domain.MediaAsset) error {
+	if strings.TrimSpace(asset.AppID) == "" || strings.TrimSpace(asset.Locale) == "" {
+		return fmt.Errorf("app_id and locale are required")
+	}
+	switch asset.AssetType {
+	case "SCREENSHOT", "FEATURE_BANNER":
+	default:
+		return fmt.Errorf("invalid asset_type %q: must be SCREENSHOT or FEATURE_BANNER", asset.AssetType)
+	}
+	switch asset.DeviceFormFactor {
+	case "PHONE", "TABLET_7", "TABLET_10", "TV", "FOLDABLE":
+	default:
+		return fmt.Errorf("invalid device_form_factor %q", asset.DeviceFormFactor)
+	}
+	if strings.TrimSpace(asset.URL) == "" {
+		return fmt.Errorf("url is required")
+	}
+	if asset.Width <= 0 || asset.Height <= 0 {
+		return fmt.Errorf("width and height must be positive")
+	}
+	if len(asset.SHA256) != 64 {
+		return fmt.Errorf("sha256 must be 64 hex chars")
+	}
+	for _, c := range strings.ToLower(asset.SHA256) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return fmt.Errorf("sha256 is not hex")
+		}
+	}
+	return nil
+}
+
+// GetChart returns a ranked app list for a chart type: top_free, top_paid,
+// trending, or top_grossing.
+func (s *CatalogService) GetChart(ctx context.Context, chartType string) ([]domain.AppSummary, error) {
+	filter := domain.AppListFilter{Limit: 20}
+	switch strings.ToLower(chartType) {
+	case "top_free":
+		filter.FreeOnly = true
+	case "top_paid", "top_grossing":
+		// Paid ranking shares the published list until paid inventory exists;
+		// ordering stays install-driven so ranks are always real positions.
+	case "trending":
+	default:
+		return nil, domain.ErrInvalidFilter
+	}
+	summaries, _, err := s.ListApps(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	if strings.EqualFold(chartType, "trending") {
+		sort.Slice(summaries, func(i, j int) bool {
+			if summaries[i].BayesianRating != summaries[j].BayesianRating {
+				return summaries[i].BayesianRating > summaries[j].BayesianRating
+			}
+			return summaries[i].InstallCount > summaries[j].InstallCount
+		})
+	}
+	return summaries, nil
+}
+
 // GetAppDetail returns aggregated app detail with locale fallback, distributions, releases.
 func (s *CatalogService) GetAppDetail(ctx context.Context, slug, requestedLocale string) (*domain.AppDetail, error) {
 	cacheKey := fmt.Sprintf("catalog:app:%s:%s", slug, requestedLocale)
@@ -142,7 +319,14 @@ func (s *CatalogService) GetAppDetail(ctx context.Context, slug, requestedLocale
 func (s *CatalogService) loadAppDetail(ctx context.Context, slug, requestedLocale string) (*domain.AppDetail, error) {
 	app, err := s.repo.GetAppBySlug(ctx, slug)
 	if err != nil {
-		return nil, err
+		if !errors.Is(err, domain.ErrAppNotFound) {
+			return nil, err
+		}
+		// Deep links may carry the stable app ID instead of the slug.
+		app, err = s.repo.GetAppByID(ctx, slug)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if app == nil {
 		return nil, domain.ErrAppNotFound

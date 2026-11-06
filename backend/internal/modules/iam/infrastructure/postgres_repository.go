@@ -151,7 +151,7 @@ func (r *PostgresUserRepository) GetUserRoles(ctx context.Context, userID string
 
 	// Fetch tenant roles from developer_org_members
 	orgRoles := make(map[string]string)
-	memRows, err := r.db.Query(ctx, `SELECT org_id, role FROM developer_org_members WHERE user_id = $1`, userID)
+	memRows, err := r.db.Query(ctx, `SELECT org_id, org_role FROM developer_org_members WHERE user_id = $1`, userID)
 	if err == nil {
 		defer memRows.Close()
 		for memRows.Next() {

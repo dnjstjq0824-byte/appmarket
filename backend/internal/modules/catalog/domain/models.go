@@ -42,6 +42,7 @@ const (
 // Errors
 var (
 	ErrAppNotFound      = errors.New("app not found")
+	ErrMediaAssetNotFound = errors.New("media asset not found")
 	ErrInvalidLocale    = errors.New("invalid locale")
 	ErrCacheUnavailable = errors.New("cache unavailable")
 	ErrInvalidFilter    = errors.New("invalid filter")
@@ -62,6 +63,7 @@ type CatalogApp struct {
 	InstallCount       int64         `json:"install_count"`
 	SourceCodeURL      *string       `json:"source_code_url,omitempty"`
 	LicenseSPDX        string        `json:"license_spdx"`
+	MonetizationType   string        `json:"monetization_type"`
 	CreatedAt          time.Time     `json:"created_at"`
 	UpdatedAt          time.Time     `json:"updated_at"`
 }
@@ -88,6 +90,8 @@ type MediaAsset struct {
 	URL              string `json:"url"`
 	Width            int    `json:"width"`
 	Height           int    `json:"height"`
+	SHA256           string `json:"-"`
+	DisplayOrder     int    `json:"display_order"`
 }
 
 // Distribution is a per-source distribution entity.
@@ -137,6 +141,7 @@ type Tag struct {
 type AppListFilter struct {
 	CategoryID string
 	TagID      string
+	Query      string
 	DirectOnly bool
 	MinRating  float64
 	FreeOnly   bool

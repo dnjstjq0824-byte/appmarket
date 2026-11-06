@@ -9,10 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"errors"
+
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/application"
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/domain"
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/distribution/presentation"
 )
+
+var errTestKillSwitchActive = errors.New("kill switch active")
 
 type mockCandidateProvider struct {
 	candidates map[string]domain.CandidateRelease
@@ -26,6 +30,63 @@ func (m *mockCandidateProvider) GetCandidatesForPackages(ctx context.Context, pa
 		}
 	}
 	return res, nil
+}
+
+func TestDistributionHandler_KillSwitchBlocksDownloads(t *testing.T) {
+	tokenSvc := application.NewDownloadTokenService("test-secret-key-1234", "cdn.appmarket.local", 15*time.Minute)
+	provider := &mockCandidateProvider{
+		candidates: map[string]domain.CandidateRelease{
+			"com.evil.app": {
+				AppID: "app-evil", ReleaseID: "rel-1", PackageName: "com.evil.app",
+				VersionCode: 101, VersionName: "1.0.1", MinSDK: 26, TargetSDK: 34,
+				NativeABIs: []string{"arm64-v8a"}, CertSHA256: "AABBCCDD11223344",
+				RolloutPercentage: 100, ReleaseStatus: domain.ReleasePublishedFull,
+				SizeBytes: 1024000, SHA256Checksum: "checksum123",
+				DownloadURL: "https://cdn.appmarket.local/packages/app-evil/rel-1/app.apk",
+			},
+		},
+	}
+	handler := presentation.NewDistributionHandler(tokenSvc, provider).WithKillSwitchValidator(func(ctx context.Context, key string) error {
+		if key == "app-evil" || key == "com.evil.app" {
+			return errTestKillSwitchActive
+		}
+		return nil
+	})
+	r := handler.Routes()
+
+	body, _ := json.Marshal(map[string]any{
+		"sha256_checksum": "checksum123", "device_or_user_id": "user-1",
+		"country_code": "KR", "rights_level": "LEVEL_1_DIRECT_HOSTED",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/apps/app-evil/releases/rel-1/download-token", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for kill-switched app token, got %d: %s", w.Code, w.Body.String())
+	}
+
+	checkBody, _ := json.Marshal(map[string]any{
+		"device": domain.DeviceSpec{SDKInt: 34, SupportedABIs: []string{"arm64-v8a"}, DeviceHash: "dev-abc", AvailableFeatures: []string{}},
+		"packages": []domain.InstalledAppSpec{{PackageName: "com.evil.app", VersionCode: 100, CertSHA256: "AABBCCDD11223344", InstallerPackageName: "com.bookingnetwork.appmarket"}},
+	})
+	reqCheck := httptest.NewRequest(http.MethodPost, "/device/check-updates", bytes.NewReader(checkBody))
+	reqCheck.Header.Set("Content-Type", "application/json")
+	wCheck := httptest.NewRecorder()
+	r.ServeHTTP(wCheck, reqCheck)
+	if wCheck.Code != http.StatusOK {
+		t.Fatalf("expected 200 for check-updates, got %d", wCheck.Code)
+	}
+	var results []domain.UpdateCandidateResult
+	if err := json.NewDecoder(wCheck.Body).Decode(&results); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if len(results) != 1 || results[0].Status != domain.StatusDistributionSuspended {
+		t.Fatalf("expected DISTRIBUTION_SUSPENDED, got %+v", results)
+	}
+	if results[0].DownloadURL != "" {
+		t.Fatalf("suspended result must not carry a download URL: %+v", results[0])
+	}
 }
 
 func TestDistributionHandler_GenerateTokenAndCheckUpdates(t *testing.T) {

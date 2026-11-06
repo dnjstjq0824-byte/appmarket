@@ -50,31 +50,44 @@ var RolePermissions = map[string][]string{
 	"ADMIN_KYB_REVIEWER": {
 		"admin:kyb:read",
 		"admin:kyb:decide",
+		"admin:approval:read",
+		"admin:approval:decide",
 	},
 	"ADMIN_APP_REVIEWER": {
 		"admin:review:read",
 		"admin:review:decide",
+		"admin:approval:read",
+		"admin:approval:decide",
 	},
 	"ADMIN_SECURITY": {
 		"admin:security:read",
 		"admin:security:decide",
 		"admin:killswitch:execute",
+		"admin:approval:read",
+		"admin:approval:decide",
 	},
 	"ADMIN_MODERATOR": {
 		"admin:moderation:read",
 		"admin:moderation:decide",
+		"admin:approval:read",
+		"admin:approval:decide",
 	},
 	"ADMIN_SEARCH_OPS": {
 		"admin:search:manage",
 		"admin:connector:manage",
+		"admin:approval:read",
+		"admin:approval:decide",
 	},
 	"ADMIN_FINANCE": {
 		"admin:finance:read",
 		"admin:refund:decide",
 		"admin:settlement:approve",
+		"admin:approval:read",
+		"admin:approval:decide",
 	},
 	"ADMIN_AUDITOR": {
 		"admin:audit:read",
+		"admin:approval:read",
 	},
 }
 

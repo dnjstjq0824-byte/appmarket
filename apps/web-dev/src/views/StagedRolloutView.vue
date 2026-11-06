@@ -17,22 +17,24 @@
         </div>
       </div>
 
+      <div v-if="isLoading" class="loading-row">Loading current release…</div>
+      <div v-if="loadError" class="alert alert-danger">{{ loadError }}</div>
       <div class="rollout-stats-grid">
         <div class="stat-box">
           <label>Target Percentage</label>
           <div class="stat-value">{{ currentPercentage }}%</div>
         </div>
         <div class="stat-box">
-          <label>Estimated Reached Users</label>
-          <div class="stat-value font-mono">{{ estimatedUsers.toLocaleString() }}</div>
+          <label>Version</label>
+          <div class="stat-value font-mono">{{ release.versionName }} ({{ release.versionCode }})</div>
         </div>
         <div class="stat-box">
-          <label>Crash-Free Sessions</label>
-          <div class="stat-value text-success font-mono">99.82%</div>
+          <label>Track</label>
+          <div class="stat-value">{{ release.track }}</div>
         </div>
         <div class="stat-box">
-          <label>Hash Bucketing Algorithm</label>
-          <div class="stat-value font-mono text-sm">CRC32(app_id + device_id)</div>
+          <label>Distribution State</label>
+          <div class="stat-value">{{ isHalted ? 'HALTED' : 'SERVING' }}</div>
         </div>
       </div>
     </div>
@@ -87,23 +89,24 @@
           {{ isUpdating ? 'Updating...' : `Update Rollout to ${selectedPercentage}%` }}
         </button>
 
-        <button 
-          v-if="!isHalted" 
-          @click="triggerEmergencyHalt" 
+        <button
+          v-if="!isHalted"
+          @click="triggerEmergencyHalt"
           class="btn btn-danger"
           :disabled="isUpdating"
         >
-          🚨 Emergency Halt Rollout
+          Emergency Halt Rollout
         </button>
-        <button 
-          v-else 
-          @click="resumeRollout" 
+        <button
+          v-else
+          @click="resumeRollout"
           class="btn btn-warning"
           :disabled="isUpdating"
         >
-          ▶️ Resume Rollout
+          Resume Rollout
         </button>
       </div>
+      <div v-if="actionError" class="alert alert-danger">{{ actionError }}</div>
 
       <!-- Emergency Halt Notice -->
       <div v-if="isHalted" class="alert alert-danger">
@@ -114,19 +117,48 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { getSharedClient, ApiClientError, type ReleaseDTO } from '@bookingnetwork/api-client';
+
+const api = getSharedClient();
 
 const release = ref({
-  versionName: '2.5.0',
-  versionCode: 20500,
-  track: 'PRODUCTION',
-  status: 'ROLLOUT_IN_PROGRESS'
+  versionName: '-',
+  versionCode: 0,
+  track: '-',
+  status: 'LOADING'
 });
 
-const currentPercentage = ref(10);
-const selectedPercentage = ref(10);
+const currentPercentage = ref(0);
+const selectedPercentage = ref(0);
 const isHalted = ref(false);
 const isUpdating = ref(false);
+const isLoading = ref(true);
+const loadError = ref('');
+
+onMounted(async () => {
+  try {
+    const current: ReleaseDTO = await api.getCurrentRelease('current');
+    applyRelease(current);
+  } catch (err) {
+    loadError.value = err instanceof ApiClientError ? err.message : 'Failed to load current release';
+    release.value.status = 'LOAD_FAILED';
+  } finally {
+    isLoading.value = false;
+  }
+});
+
+function applyRelease(current: ReleaseDTO) {
+  release.value = {
+    versionName: current.versionName,
+    versionCode: current.versionCode,
+    track: current.track,
+    status: current.status
+  };
+  currentPercentage.value = current.rolloutPercentage;
+  selectedPercentage.value = current.rolloutPercentage;
+  isHalted.value = current.status === 'HALTED' || !!current.isHalted;
+}
 
 const availableStages = [1, 5, 10, 20, 50, 100];
 
@@ -136,35 +168,23 @@ const statusBadgeClass = computed(() => {
   return 'badge-primary';
 });
 
-const estimatedUsers = computed(() => {
-  const totalBase = 250000;
-  if (isHalted.value) return 0;
-  return Math.round((totalBase * currentPercentage.value) / 100);
-});
-
 function selectStage(stage: number) {
   if (stage >= currentPercentage.value && !isHalted.value) {
     selectedPercentage.value = stage;
   }
 }
 
+const actionError = ref('');
+
 async function applyRolloutUpdate() {
   if (selectedPercentage.value <= currentPercentage.value) return;
   isUpdating.value = true;
+  actionError.value = '';
   try {
-    const res = await fetch('/api/v1/developer/releases/current/rollout', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rolloutPercentage: selectedPercentage.value })
-    });
-    if (res.ok) {
-      currentPercentage.value = selectedPercentage.value;
-      if (currentPercentage.value === 100) {
-        release.value.status = 'COMPLETED';
-      }
-    }
+    const updated = await api.updateRollout('current', { rolloutPercentage: selectedPercentage.value });
+    applyRelease(updated);
   } catch (err) {
-    console.error('Failed to update rollout', err);
+    actionError.value = err instanceof ApiClientError ? err.message : 'Failed to update rollout';
   } finally {
     isUpdating.value = false;
   }
@@ -175,18 +195,12 @@ async function triggerEmergencyHalt() {
     return;
   }
   isUpdating.value = true;
+  actionError.value = '';
   try {
-    const res = await fetch('/api/v1/developer/releases/current/rollout', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'HALT' })
-    });
-    if (res.ok) {
-      isHalted.value = true;
-      release.value.status = 'HALTED';
-    }
+    const updated = await api.updateRollout('current', { action: 'HALT' });
+    applyRelease(updated);
   } catch (err) {
-    console.error('Failed to halt rollout', err);
+    actionError.value = err instanceof ApiClientError ? err.message : 'Failed to halt rollout';
   } finally {
     isUpdating.value = false;
   }
@@ -194,18 +208,12 @@ async function triggerEmergencyHalt() {
 
 async function resumeRollout() {
   isUpdating.value = true;
+  actionError.value = '';
   try {
-    const res = await fetch('/api/v1/developer/releases/current/rollout', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'RESUME', rolloutPercentage: currentPercentage.value })
-    });
-    if (res.ok) {
-      isHalted.value = false;
-      release.value.status = 'ROLLOUT_IN_PROGRESS';
-    }
+    const updated = await api.updateRollout('current', { action: 'RESUME' });
+    applyRelease(updated);
   } catch (err) {
-    console.error('Failed to resume rollout', err);
+    actionError.value = err instanceof ApiClientError ? err.message : 'Failed to resume rollout';
   } finally {
     isUpdating.value = false;
   }
@@ -222,6 +230,11 @@ async function resumeRollout() {
   margin-bottom: 24px;
 }
 .subtitle {
+  color: #64748b;
+  font-size: 14px;
+}
+.loading-row {
+  padding: 16px;
   color: #64748b;
   font-size: 14px;
 }

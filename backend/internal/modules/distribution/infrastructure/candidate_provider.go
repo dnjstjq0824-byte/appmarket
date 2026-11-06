@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -88,13 +89,17 @@ func (p *InMemoryCandidateProvider) GetCandidatesForPackages(ctx context.Context
 // PostgresCandidateProvider queries candidates from PostgreSQL 16 database.
 type PostgresCandidateProvider struct {
 	db       *pgxpool.Pool
+	cdnBase  string
 	fallback *InMemoryCandidateProvider
 }
 
 // NewPostgresCandidateProvider creates a candidate provider backed by PostgreSQL with in-memory fallback.
-func NewPostgresCandidateProvider(db *pgxpool.Pool) *PostgresCandidateProvider {
+// cdnBase is the public CDN origin (host or host/path, without scheme) used to
+// compose download URLs from release_artifacts.s3_public_key.
+func NewPostgresCandidateProvider(db *pgxpool.Pool, cdnBase string) *PostgresCandidateProvider {
 	return &PostgresCandidateProvider{
 		db:       db,
+		cdnBase:  strings.Trim(strings.TrimSpace(cdnBase), "/"),
 		fallback: NewInMemoryCandidateProvider(),
 	}
 }
@@ -106,15 +111,19 @@ func (p *PostgresCandidateProvider) GetCandidatesForPackages(ctx context.Context
 	}
 
 	query := `
-		SELECT 
-			r.app_id, r.id, a.primary_package_name, r.version_code, r.version_name,
-			r.min_sdk, r.target_sdk, r.supported_abis, r.signing_cert_sha256,
-			r.rollout_percentage, r.status, r.universal_binary_url, r.universal_sha256,
-			r.file_size_bytes
-		FROM releases r
-		JOIN apps a ON r.app_id = a.id
-		WHERE a.primary_package_name = ANY($1)
-		  AND r.status IN ('PUBLISHED_FULL', 'PUBLISHED_STAGED')
+		SELECT
+			r.app_id, r.id, d.package_name, r.version_code, r.version_name,
+			art.min_sdk, art.target_sdk, art.native_abis, art.required_features,
+			COALESCE(d.signing_cert_sha256, ''),
+			r.rollout_percentage, r.release_status,
+			art.s3_public_key, art.sha256_checksum, art.file_size_bytes
+		FROM app_releases r
+		JOIN app_distributions d ON d.id = r.distribution_id
+		JOIN catalog_apps a ON a.id = r.app_id
+		JOIN release_artifacts art ON art.release_id = r.id
+			AND art.artifact_status = 'PUBLISHED_ON_CDN'
+		WHERE d.package_name = ANY($1)
+		  AND r.release_status IN ('PUBLISHED_STAGED', 'PUBLISHED_FULL')
 		ORDER BY r.version_code DESC`
 
 	rows, err := p.db.Query(ctx, query, packageNames)
@@ -128,8 +137,7 @@ func (p *PostgresCandidateProvider) GetCandidatesForPackages(ctx context.Context
 	for rows.Next() {
 		var cand domain.CandidateRelease
 		var statusStr string
-		var binaryURL, sha256 *string
-		var sizeBytes *int64
+		var publicKey *string
 
 		if err := rows.Scan(
 			&cand.AppID,
@@ -140,25 +148,20 @@ func (p *PostgresCandidateProvider) GetCandidatesForPackages(ctx context.Context
 			&cand.MinSDK,
 			&cand.TargetSDK,
 			&cand.NativeABIs,
+			&cand.RequiredFeatures,
 			&cand.CertSHA256,
 			&cand.RolloutPercentage,
 			&statusStr,
-			&binaryURL,
-			&sha256,
-			&sizeBytes,
+			&publicKey,
+			&cand.SHA256Checksum,
+			&cand.SizeBytes,
 		); err != nil {
 			return nil, err
 		}
 
 		cand.ReleaseStatus = domain.ReleaseStatus(statusStr)
-		if binaryURL != nil {
-			cand.DownloadURL = *binaryURL
-		}
-		if sha256 != nil {
-			cand.SHA256Checksum = *sha256
-		}
-		if sizeBytes != nil {
-			cand.SizeBytes = *sizeBytes
+		if publicKey != nil && *publicKey != "" && p.cdnBase != "" {
+			cand.DownloadURL = "https://" + p.cdnBase + "/" + strings.TrimPrefix(*publicKey, "/")
 		}
 
 		// Keep highest version code per package

@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"crypto/rand"
+	"crypto/rsa"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -43,7 +44,23 @@ import (
 	iamPres "github.com/bookingnetwork/appmarket/backend/internal/modules/iam/presentation"
 	iamRbac "github.com/bookingnetwork/appmarket/backend/internal/modules/iam/rbac"
 
+	moderationApp "github.com/bookingnetwork/appmarket/backend/internal/modules/moderation/application"
+	moderationPres "github.com/bookingnetwork/appmarket/backend/internal/modules/moderation/presentation"
+
+	searchApp "github.com/bookingnetwork/appmarket/backend/internal/modules/search/application"
+	searchPres "github.com/bookingnetwork/appmarket/backend/internal/modules/search/presentation"
+
+	analyticsPres "github.com/bookingnetwork/appmarket/backend/internal/modules/analytics/presentation"
+	"github.com/bookingnetwork/appmarket/backend/internal/modules/analytics"
+
+	adsApp "github.com/bookingnetwork/appmarket/backend/internal/modules/ads/application"
+
+	securityApp "github.com/bookingnetwork/appmarket/backend/internal/modules/security/application"
+
+	auditpkg "github.com/bookingnetwork/appmarket/backend/internal/platform/audit"
+	consolepkg "github.com/bookingnetwork/appmarket/backend/internal/platform/console"
 	problem "github.com/bookingnetwork/appmarket/backend/internal/platform/errors"
+	"github.com/bookingnetwork/appmarket/backend/internal/platform/sentryx"
 )
 
 type Config struct {
@@ -58,6 +75,42 @@ type Config struct {
 	Logger            *slog.Logger
 	HTTPClient        *http.Client
 	DisableRateLimit  bool
+	// Secrets and environment-provided settings. The secrets are
+	// required: New fails closed when any of them is empty, and the payout
+	// encryption key must be exactly 32 bytes.
+	IAMHMACSecret         string
+	DistributionTokenSecret string
+	PGWebhookSecret       string
+	PayoutEncryptionKey   string
+	JWTIssuer             string
+	JWTPrivateKey         *rsa.PrivateKey
+	CDNDomain             string
+	PublicBaseURL         string
+	PGProvider            string
+	TossSecretKey         string
+	PortOneAPIKey         string
+	PortOneStoreID        string
+	PGIsLive              bool
+	SentryDSN             string
+	AppEnv                string
+	OAuthRedirectBaseURL  string
+	GoogleClientID        string
+	GoogleClientSecret    string
+	GitHubClientID        string
+	GitHubClientSecret    string
+	AppleClientID         string
+	AppleTeamID           string
+	AppleKeyID            string
+	ApplePrivateKeyPEM    string
+	MediaBucket           string
+}
+
+// mediaBucketName resolves the listing-image bucket with a safe default.
+func mediaBucketName(cfg Config) string {
+	if strings.TrimSpace(cfg.MediaBucket) != "" {
+		return strings.TrimSpace(cfg.MediaBucket)
+	}
+	return "bn-public-media"
 }
 
 type Server struct {
@@ -70,11 +123,30 @@ type Server struct {
 	distributionHandler *distributionPres.DistributionHandler
 	authHandler         *iamPres.AuthHandler
 	commerceHandler     *commercePres.CommerceHandler
+	moderationHandler   *moderationPres.ModerationHandler
+	searchHandler       *searchPres.SearchHandler
+	analyticsHandler    *analyticsPres.AnalyticsHandler
+	adminHandler        *AdminHandler
 }
 
 func New(cfg Config) (*Server, error) {
 	if cfg.DB == nil || cfg.Redis == nil || cfg.OpenSearchURL == "" || cfg.S3HealthURL == "" || cfg.Logger == nil {
 		return nil, fmt.Errorf("database, redis, opensearch, object storage and logger are required")
+	}
+	if cfg.IAMHMACSecret == "" || cfg.DistributionTokenSecret == "" || cfg.PGWebhookSecret == "" || cfg.PayoutEncryptionKey == "" {
+		return nil, fmt.Errorf("IAMHMACSecret, DistributionTokenSecret, PGWebhookSecret and PayoutEncryptionKey are required")
+	}
+	if cfg.JWTIssuer == "" {
+		cfg.JWTIssuer = "https://auth.appmarket.local"
+	}
+	if cfg.CDNDomain == "" {
+		cfg.CDNDomain = "cdn.appmarket.local"
+	}
+	if cfg.PublicBaseURL == "" {
+		cfg.PublicBaseURL = "https://appmarket.bookingnetwork.internal"
+	}
+	if cfg.PGProvider == "" {
+		cfg.PGProvider = "toss"
 	}
 	if cfg.HTTPClient == nil {
 		cfg.HTTPClient = &http.Client{Timeout: 2 * time.Second}
@@ -109,7 +181,7 @@ func New(cfg Config) (*Server, error) {
 	sessionRepo := iamInfra.NewPostgresSessionRepository(cfg.DB)
 	mfaRepo := iamInfra.NewPostgresMFARepository(cfg.DB)
 	hasher := iamApp.NewPasswordHasher()
-	jwtManager, err := iamApp.NewJWTManager(nil, "https://auth.appmarket.local")
+	jwtManager, err := iamApp.NewJWTManager(cfg.JWTPrivateKey, cfg.JWTIssuer)
 	if err != nil {
 		return nil, fmt.Errorf("jwt manager initialization failed: %w", err)
 	}
@@ -118,12 +190,25 @@ func New(cfg Config) (*Server, error) {
 	dualControl := iamRbac.NewDualControlEngine(dualApprovalRepo)
 	matrixEnforcer := iamRbac.NewMatrixEnforcer(jwtManager)
 	authCfg := iamApp.AuthServiceConfig{
-		HMACSecret:      "appmarket-iam-blind-index-hmac-salt",
+		HMACSecret:      cfg.IAMHMACSecret,
 		MaxFailedLogin:  5,
 		LockoutDuration: 15 * time.Minute,
 	}
 	authSvc := iamApp.NewAuthService(userRepo, sessionRepo, mfaRepo, hasher, jwtManager, mfaService, authCfg)
-	s.authHandler = iamPres.NewAuthHandler(authSvc, jwtManager, dualControl, matrixEnforcer, "https://auth.appmarket.local")
+	identityRepo := iamInfra.NewPostgresIdentityRepository(cfg.DB)
+	oauthSvc := iamApp.NewOAuthService(authSvc, userRepo, identityRepo, cfg.OAuthRedirectBaseURL)
+	oauthPresets := iamApp.DefaultOAuthProviders()
+	googleCfg := oauthPresets["google"]
+	googleCfg.ClientID, googleCfg.ClientSecret = cfg.GoogleClientID, cfg.GoogleClientSecret
+	oauthSvc.RegisterProvider(googleCfg)
+	githubCfg := oauthPresets["github"]
+	githubCfg.ClientID, githubCfg.ClientSecret = cfg.GitHubClientID, cfg.GitHubClientSecret
+	oauthSvc.RegisterProvider(githubCfg)
+	appleCfg := oauthPresets["apple"]
+	appleCfg.ClientID = cfg.AppleClientID
+	appleCfg.AppleTeamID, appleCfg.AppleKeyID, appleCfg.ApplePrivateKeyPEM = cfg.AppleTeamID, cfg.AppleKeyID, cfg.ApplePrivateKeyPEM
+	oauthSvc.RegisterProvider(appleCfg)
+	s.authHandler = iamPres.NewAuthHandler(authSvc, jwtManager, dualControl, matrixEnforcer, cfg.JWTIssuer, oauthSvc)
 
 	// 3. Developer domain wiring
 	devRepo := developerInfra.NewPostgresDeveloperRepository(cfg.DB)
@@ -145,22 +230,116 @@ func New(cfg Config) (*Server, error) {
 		return "", errors.New("unauthorized")
 	}
 	s.developerHandler = developerPres.NewDeveloperHandler(orgSvc, memberSvc, apiKeySvc, identityResolver)
+	payoutKey := []byte(cfg.PayoutEncryptionKey)
+	if len(payoutKey) != 32 {
+		return nil, fmt.Errorf("PAYOUT_ENC_KEY must be exactly 32 bytes")
+	}
+	payoutAccountSvc, err := developerApp.NewPayoutService(devRepo, payoutKey)
+	if err != nil {
+		return nil, fmt.Errorf("payout service configuration failed: %w", err)
+	}
+	s.developerHandler.AttachPayouts(payoutAccountSvc)
 
 	// 4. Distribution domain wiring
-	tokenSecret := "appmarket-distribution-hmac-secret-v1"
-	cdnDomain := "cdn.appmarket.local"
-	tokenSvc := distributionApp.NewDownloadTokenService(tokenSecret, cdnDomain, 15*time.Minute)
-	candidateProvider := distributionInfra.NewPostgresCandidateProvider(cfg.DB)
+	tokenSvc := distributionApp.NewDownloadTokenService(cfg.DistributionTokenSecret, cfg.CDNDomain, 15*time.Minute)
+	candidateProvider := distributionInfra.NewPostgresCandidateProvider(cfg.DB, cfg.CDNDomain)
 	s.distributionHandler = distributionPres.NewDistributionHandler(tokenSvc, candidateProvider)
 
 	// 5. Commerce domain wiring
 	ledgerSvc := commerceApp.NewLedgerService()
-	pgWebhookSecret := "appmarket-pg-live-webhook-secret-v1"
-	orderSvc := commerceApp.NewOrderService(ledgerSvc, pgWebhookSecret)
+	orderSvc := commerceApp.NewOrderService(ledgerSvc, cfg.PGWebhookSecret)
 	refundSvc := commerceSet.NewRefundService(ledgerSvc, orderSvc)
-	s.commerceHandler = commercePres.NewCommerceHandler(orderSvc, refundSvc, identityResolver)
+	invoiceSvc := commerceSet.NewInvoiceService()
+	subscriptionSvc := commerceSet.NewSubscriptionService()
+	promoSvc := commerceApp.NewPromoService()
+	pricingSvc := commerceApp.NewPricingService()
+	payoutSvc := commerceSet.NewMonthlyPayoutService(ledgerSvc)
+	s.commerceHandler = commercePres.NewCommerceHandler(orderSvc, refundSvc, invoiceSvc, subscriptionSvc, identityResolver, commercePGClient(cfg, cfg.Logger), cfg.PublicBaseURL, promoSvc).WithPricing(pricingSvc)
+
+	// 6. Moderation domain wiring
+	reviewSvc := moderationApp.NewReviewService(moderationApp.NewInMemoryInstallVerifier(), moderationApp.NewAntiFraudDetector())
+	reportSvc := moderationApp.NewReportService()
+	appealSvc := moderationApp.NewAppealService()
+	s.moderationHandler = moderationPres.NewModerationHandler(reviewSvc, reportSvc, appealSvc, identityResolver)
+
+	// 7. Search domain wiring (OpenSearch primary, in-memory fallback)
+	searchPrimary := searchApp.NewOpenSearchEngine(cfg.OpenSearchURL, cfg.OpenSearchUser, cfg.OpenSearchPass, "apps", cfg.HTTPClient)
+	searchSvc := searchApp.NewSearchService(searchPrimary, searchApp.NewInMemoryFallbackSearchEngine())
+	s.searchHandler = searchPres.NewSearchHandler(searchSvc)
+
+	// 8. Analytics wiring
+	eventStore := analytics.NewMemoryEventStore()
+	ingestor := analytics.NewFunnelIngestor(eventStore)
+	s.analyticsHandler = analyticsPres.NewAnalyticsHandler(ingestor)
+
+	// 9. Console aggregations (developer + admin)
+	securitySvc := securityApp.NewSecurityService(nil)
+	auditRepo := auditpkg.NewInMemoryAuditRepository()
+	auditLogger := auditpkg.NewHashChainLogger(auditRepo)
+	artifactSvc := distributionApp.NewArtifactService(distributionApp.NewInMemoryDistributionRepo(), nil)
+	auctionEngine := adsApp.NewAuctionEngine(50)
+	campaignSvc := adsApp.NewCampaignService(auctionEngine)
+	resolver := consolepkg.NewOrgAppResolver(orgSvc, memberSvc, catalogSvc)
+	uploadSvc := consolepkg.NewUploadService(artifactSvc)
+	rolloutSvc := consolepkg.NewRolloutService(artifactSvc)
+	catalogViewSvc := consolepkg.NewCatalogViewService(resolver, catalogSvc)
+	metadataSvc := consolepkg.NewMetadataService(resolver, catalogSvc).
+		WithMediaStorage(distributionApp.NewInMemoryObjectStorage(), mediaBucketName(cfg))
+	adsViewSvc := consolepkg.NewAdsViewService(resolver, campaignSvc)
+	commerceViewSvc := consolepkg.NewCommerceViewService(resolver, promoSvc, pricingSvc, orderSvc)
+	lineageSvc := consolepkg.NewLineageService(resolver, artifactSvc)
+	s.developerHandler.AttachConsole(developerPres.ConsoleDeps{
+		Resolver: resolver, Uploads: uploadSvc, Rollouts: rolloutSvc,
+		Catalog: catalogViewSvc, Metadata: metadataSvc, Ads: adsViewSvc,
+		Commerce: commerceViewSvc, Lineage: lineageSvc,
+	})
+	decisionSvc := consolepkg.NewDecisionService(auditLogger).WithCatalog(catalogSvc)
+	connectorSvc := consolepkg.NewConnectorService()
+	s.adminHandler = NewAdminHandler(decisionSvc, securitySvc, connectorSvc, payoutSvc, auditRepo, orderSvc, campaignSvc, eventStore, reportSvc, appealSvc, identityResolver)
+	s.adminHandler.AttachAuthorizer(matrixEnforcer)
+	s.adminHandler.AttachVerifications(orgSvc)
+	s.adminHandler.AttachCatalog(catalogSvc)
+	s.adminHandler.AttachRefunds(orderSvc, refundSvc)
+	s.distributionHandler.WithKillSwitchValidator(func(ctx context.Context, key string) error {
+		if err := securitySvc.ValidateDownloadRequest(ctx, key); err != nil {
+			return err
+		}
+		if app, err := catalogSvc.GetAppByID(ctx, key); err == nil && app != nil {
+			return securitySvc.ValidateDownloadRequest(ctx, app.PrimaryPackageName)
+		}
+		return nil
+	})
 
 	return s, nil
+}
+
+// commercePGClient builds the configured payment-gateway client. Unknown or
+// empty providers fall back to Toss; without live credentials the client
+// operates in sandbox mode (documented on PGConfig).
+func commercePGClient(cfg Config, logger *slog.Logger) commerceApp.PGClient {
+	httpClient := cfg.HTTPClient
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 10 * time.Second}
+	}
+	if strings.EqualFold(cfg.PGProvider, "portone") {
+		logger.Info("commerce PG provider selected", "provider", "portone", "live", cfg.PGIsLive)
+		return commerceApp.NewPortOneV2Client(commerceApp.PGConfig{
+			Provider:     commerceApp.PGProviderPortOne,
+			SecretKey:    cfg.PortOneAPIKey,
+			ClientKey:    cfg.PortOneStoreID,
+			WebhookSecret: cfg.PGWebhookSecret,
+			IsLive:       cfg.PGIsLive,
+			HTTPClient:   httpClient,
+		})
+	}
+	logger.Info("commerce PG provider selected", "provider", "toss", "live", cfg.PGIsLive)
+	return commerceApp.NewTossPaymentsClient(commerceApp.PGConfig{
+		Provider:     commerceApp.PGProviderToss,
+		SecretKey:    cfg.TossSecretKey,
+		WebhookSecret: cfg.PGWebhookSecret,
+		IsLive:       cfg.PGIsLive,
+		HTTPClient:   httpClient,
+	})
 }
 
 func (s *Server) Handler() http.Handler {
@@ -185,6 +364,18 @@ func (s *Server) Handler() http.Handler {
 	}
 	if s.commerceHandler != nil {
 		r.Mount("/api/v1/commerce", s.commerceHandler.Routes())
+	}
+	if s.moderationHandler != nil {
+		r.Mount("/api/v1/moderation", s.moderationHandler.Routes())
+	}
+	if s.searchHandler != nil {
+		r.Mount("/api/v1/search", s.searchHandler.Routes())
+	}
+	if s.analyticsHandler != nil {
+		r.Mount("/api/v1/analytics", s.analyticsHandler.Routes())
+	}
+	if s.adminHandler != nil {
+		r.Mount("/api/v1/admin", s.adminHandler.Routes())
 	}
 
 	r.NotFound(func(w http.ResponseWriter, req *http.Request) {
@@ -282,6 +473,7 @@ func (s *Server) recoverPanic(next http.Handler) http.Handler {
 		defer func() {
 			if v := recover(); v != nil {
 				s.cfg.Logger.Error("request panic", "request_id", traceID(r), "error", v)
+				sentryx.Capture(r.Context(), fmt.Errorf("request panic: %v", v))
 				problem.Write(w, http.StatusInternalServerError, "ERR_INTERNAL_SERVER_ERROR", "Internal server error", "The request failed unexpectedly.", traceID(r))
 			}
 		}()
@@ -289,6 +481,10 @@ func (s *Server) recoverPanic(next http.Handler) http.Handler {
 	})
 }
 
+// cors enforces the configured allowlist. CSRF tokens are intentionally
+// absent: the API is stateless Bearer-only and never issues cookies, so
+// browsers attach no ambient credentials and cross-site request forgery has
+// no vector. This is pinned by TestOWASP_NoCookieAuth_NoCSRFVector.
 func (s *Server) cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")

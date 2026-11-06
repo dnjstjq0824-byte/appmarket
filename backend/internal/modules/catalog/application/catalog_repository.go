@@ -16,6 +16,13 @@ type CatalogRepository interface {
 	GetLatestRelease(ctx context.Context, distributionID string) (*domain.Release, error)
 	GetCategories(ctx context.Context) ([]domain.Category, error)
 	GetTags(ctx context.Context, appID string) ([]domain.Tag, error)
+	ListAppsByOrg(ctx context.Context, orgID string) ([]domain.CatalogApp, error)
+	UpsertLocalization(ctx context.Context, loc domain.Localization) (*domain.Localization, error)
+	AddMediaAsset(ctx context.Context, asset domain.MediaAsset) (*domain.MediaAsset, error)
+	DeleteMediaAsset(ctx context.Context, appID, assetID string) error
+	GetAppByID(ctx context.Context, appID string) (*domain.CatalogApp, error)
+	UpdateCatalogStatus(ctx context.Context, appID string, status domain.CatalogStatus) error
+	ListAppsByStatus(ctx context.Context, statuses []domain.CatalogStatus) ([]domain.CatalogApp, error)
 }
 
 // Cache abstracts a key-value cache (Redis) for read-through caching.

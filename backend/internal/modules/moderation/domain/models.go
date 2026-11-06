@@ -63,3 +63,36 @@ type DeveloperAppeal struct {
 	DecidedAt          *time.Time   `json:"decided_at,omitempty"`
 }
 
+type ReportStatus string
+
+const (
+	ReportOpen            ReportStatus = "OPEN"
+	ReportInInvestigation ReportStatus = "IN_INVESTIGATION"
+	ReportActionTaken     ReportStatus = "ACTION_TAKEN"
+	ReportDismissed       ReportStatus = "DISMISSED"
+)
+
+var (
+	ErrReportNotFound      = errors.New("ERR_REPORT_NOT_FOUND")
+	ErrReportInvalid       = errors.New("ERR_REPORT_INVALID")
+	ErrReportAlreadyClosed = errors.New("ERR_REPORT_ALREADY_CLOSED")
+)
+
+// ModerationReport is an abuse/safety report filed against an app, review,
+// or developer org. Categories match moderation_reports.report_category.
+type ModerationReport struct {
+	ID               string       `json:"id"`
+	ReporterUserID   string       `json:"reporter_user_id,omitempty"`
+	ReporterEmail    string       `json:"reporter_email"`
+	TargetType       string       `json:"target_type"`
+	TargetID         string       `json:"target_id"`
+	ReportCategory   string       `json:"report_category"`
+	Description      string       `json:"description"`
+	Priority         string       `json:"priority"`
+	Status           ReportStatus `json:"status"`
+	AssignedModeratorID string    `json:"assigned_moderator_id,omitempty"`
+	ResolutionNotes  string       `json:"resolution_notes,omitempty"`
+	CreatedAt        time.Time    `json:"created_at"`
+	ResolvedAt       *time.Time   `json:"resolved_at,omitempty"`
+}
+

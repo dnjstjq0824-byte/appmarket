@@ -89,3 +89,118 @@ type LedgerTransaction struct {
 	CreatedAt      time.Time     `json:"created_at"`
 }
 
+type InvoiceStatus string
+
+const (
+	InvoiceIssued   InvoiceStatus = "ISSUED"
+	InvoiceRefunded InvoiceStatus = "REFUNDED"
+	InvoiceVoid     InvoiceStatus = "VOID"
+)
+
+// Invoice is the buyer-facing receipt issued exactly once per paid order.
+type Invoice struct {
+	ID               string        `json:"id"`
+	InvoiceNumber    string        `json:"invoice_number"`
+	OrderID          string        `json:"order_id"`
+	UserID           string        `json:"user_id"`
+	AppID            string        `json:"app_id"`
+	OrgID            string        `json:"org_id"`
+	Currency         Currency      `json:"currency"`
+	GrossAmount      int64         `json:"gross_amount"`
+	TaxAmount        int64         `json:"tax_amount"`
+	CommissionAmount int64         `json:"commission_amount"`
+	DevPayoutAmount  int64         `json:"dev_payout_amount"`
+	PGPaymentID      string        `json:"pg_payment_id,omitempty"`
+	Status           InvoiceStatus `json:"status"`
+	IssuedAt         time.Time     `json:"issued_at"`
+}
+
+type SubscriptionStatus string
+
+const (
+	SubscriptionActive    SubscriptionStatus = "ACTIVE"
+	SubscriptionCancelled SubscriptionStatus = "CANCELLED"
+	SubscriptionExpired   SubscriptionStatus = "EXPIRED"
+)
+
+type BillingInterval string
+
+const (
+	BillingMonthly BillingInterval = "MONTHLY"
+	BillingYearly  BillingInterval = "YEARLY"
+)
+
+var (
+	ErrSubscriptionNotFound       = errors.New("ERR_SUBSCRIPTION_NOT_FOUND")
+	ErrSubscriptionAlreadyEnded   = errors.New("ERR_SUBSCRIPTION_ALREADY_ENDED")
+	ErrInvalidBillingInterval     = errors.New("ERR_INVALID_BILLING_INTERVAL")
+	ErrInvalidSubscriptionAmount  = errors.New("ERR_INVALID_SUBSCRIPTION_AMOUNT")
+	ErrSubscriptionAccessDenied   = errors.New("ERR_SUBSCRIPTION_ACCESS_DENIED")
+)
+
+type DiscountType string
+
+const (
+	DiscountPercentage DiscountType = "PERCENTAGE"
+	DiscountFixedMinor DiscountType = "FIXED_MINOR"
+	DiscountFreeRedeem DiscountType = "FREE_REDEEM"
+)
+
+var (
+	ErrPromoNotFound      = errors.New("ERR_PROMO_NOT_FOUND")
+	ErrPromoExpired       = errors.New("ERR_PROMO_EXPIRED")
+	ErrPromoExhausted     = errors.New("ERR_PROMO_EXHAUSTED")
+	ErrPromoAlreadyUsed   = errors.New("ERR_PROMO_ALREADY_USED")
+	ErrPromoInvalid       = errors.New("ERR_PROMO_INVALID")
+	ErrPriceTierInvalid   = errors.New("ERR_PRICE_TIER_INVALID")
+)
+
+// Promotion is a discount campaign; PromoCode holds its redeemable codes.
+type Promotion struct {
+	ID            string       `json:"id"`
+	AppID         string       `json:"app_id"`
+	CampaignName  string       `json:"campaign_name"`
+	DiscountType  DiscountType `json:"discount_type"`
+	DiscountValue int          `json:"discount_value"`
+	StartsAt      time.Time    `json:"starts_at"`
+	EndsAt        time.Time    `json:"ends_at"`
+	MaxUses       int          `json:"max_uses"`
+	UsedCount     int          `json:"used_count"`
+	CreatedAt     time.Time    `json:"created_at"`
+}
+
+type PromoCode struct {
+	ID          string `json:"id"`
+	PromotionID string `json:"promotion_id"`
+	Code        string `json:"code"`
+	MaxUses     int    `json:"max_uses"`
+	UsedCount   int    `json:"used_count"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// PriceTier is a per-country list price for an app.
+type PriceTier struct {
+	AppID        string   `json:"app_id"`
+	CountryCode  string   `json:"country_code"`
+	Currency     Currency `json:"currency"`
+	ListPriceMinor int64  `json:"list_price_minor"`
+	TaxInclusive bool     `json:"tax_inclusive"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// Subscription is a recurring billing relationship for SUBSCRIPTION_READY apps.
+type Subscription struct {
+	ID                 string             `json:"id"`
+	UserID             string             `json:"user_id"`
+	AppID              string             `json:"app_id"`
+	OrgID              string             `json:"org_id"`
+	BillingInterval    BillingInterval    `json:"billing_interval"`
+	AmountMinor        int64              `json:"amount_minor"`
+	Currency           Currency           `json:"currency"`
+	Status             SubscriptionStatus `json:"status"`
+	CurrentPeriodStart time.Time          `json:"current_period_start"`
+	CurrentPeriodEnd   time.Time          `json:"current_period_end"`
+	CancelledAt        *time.Time         `json:"cancelled_at,omitempty"`
+	CreatedAt          time.Time          `json:"created_at"`
+}
+

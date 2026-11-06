@@ -36,7 +36,8 @@ func TestCommerceHandler_FullLifecycle(t *testing.T) {
 		return currentUserID, nil
 	}
 
-	handler := presentation.NewCommerceHandler(orderService, refundService, mockIdentity)
+	pgClient := application.NewTossPaymentsClient(application.PGConfig{Provider: application.PGProviderToss})
+	handler := presentation.NewCommerceHandler(orderService, refundService, nil, nil, mockIdentity, pgClient, "https://appmarket.test", nil)
 	router := handler.Routes()
 
 	// 1. Unauthenticated request -> 401
@@ -74,12 +75,19 @@ func TestCommerceHandler_FullLifecycle(t *testing.T) {
 		t.Fatalf("unexpected order values: %+v", createdOrder)
 	}
 
-	// 3. Create Checkout Session -> 200 OK
+	// 3. Create Checkout Session -> 200 OK with real PG session shape
 	reqCheckout := httptest.NewRequest(http.MethodPost, "/orders/"+createdOrder.ID+"/checkout", nil)
 	wCheckout := httptest.NewRecorder()
 	router.ServeHTTP(wCheckout, reqCheckout)
 	if wCheckout.Code != http.StatusOK {
 		t.Fatalf("expected 200 OK for checkout session, got %d: %s", wCheckout.Code, wCheckout.Body.String())
+	}
+	var session application.PGSessionResult
+	if err := json.NewDecoder(wCheckout.Body).Decode(&session); err != nil {
+		t.Fatalf("failed to decode checkout session: %v", err)
+	}
+	if session.OrderID != createdOrder.ID || session.AmountKRW != 20000 || session.CheckoutURL == "" {
+		t.Fatalf("unexpected checkout session: %+v", session)
 	}
 
 	// 4. PG Webhook with invalid signature -> 401
@@ -137,6 +145,96 @@ func TestCommerceHandler_FullLifecycle(t *testing.T) {
 	entAfter := orderService.GetEntitlement(currentUserID, "app-pro-editor")
 	if entAfter.Status != domain.EntitlementRevoked {
 		t.Fatalf("expected entitlement revoked after refund, got %s", entAfter.Status)
+	}
+
+	// 8. Double refund -> 400 (canonical order already REFUNDED)
+	reqRefund2 := httptest.NewRequest(http.MethodPost, "/orders/"+createdOrder.ID+"/refund", bytes.NewReader([]byte(`{"reason":"again"}`)))
+	reqRefund2.Header.Set("Content-Type", "application/json")
+	wRefund2 := httptest.NewRecorder()
+	router.ServeHTTP(wRefund2, reqRefund2)
+	if wRefund2.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for double refund, got %d: %s", wRefund2.Code, wRefund2.Body.String())
+	}
+
+	// 9. Invoice issued on payment, marked refunded after refund
+	reqInv := httptest.NewRequest(http.MethodGet, "/invoices", nil)
+	wInv := httptest.NewRecorder()
+	router.ServeHTTP(wInv, reqInv)
+	if wInv.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for invoices, got %d: %s", wInv.Code, wInv.Body.String())
+	}
+	var invoices []domain.Invoice
+	if err := json.NewDecoder(wInv.Body).Decode(&invoices); err != nil {
+		t.Fatalf("failed to decode invoices: %v", err)
+	}
+	if len(invoices) != 1 || invoices[0].OrderID != createdOrder.ID || invoices[0].Status != domain.InvoiceRefunded {
+		t.Fatalf("unexpected invoices: %+v", invoices)
+	}
+	if invoices[0].InvoiceNumber == "" {
+		t.Fatalf("expected invoice number to be issued")
+	}
+
+	// 10. Duplicate order with same idempotency key returns original
+	reqDup := httptest.NewRequest(http.MethodPost, "/orders", bytes.NewReader(orderReqBody))
+	reqDup.Header.Set("Content-Type", "application/json")
+	wDup := httptest.NewRecorder()
+	router.ServeHTTP(wDup, reqDup)
+	if wDup.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for idempotent replay, got %d: %s", wDup.Code, wDup.Body.String())
+	}
+	var dupOrder domain.Order
+	if err := json.NewDecoder(wDup.Body).Decode(&dupOrder); err != nil {
+		t.Fatalf("failed to decode duplicate order: %v", err)
+	}
+	if dupOrder.ID != createdOrder.ID {
+		t.Fatalf("idempotency violated: %s != %s", dupOrder.ID, createdOrder.ID)
+	}
+
+	// 11. Subscription lifecycle: create -> list -> cancel -> cancel-again 409
+	subBody, _ := json.Marshal(map[string]any{
+		"app_id": "app-pro-editor", "org_id": "org-dev-studio",
+		"billing_interval": "MONTHLY", "amount_minor": 9900, "currency": "KRW",
+	})
+	reqSub := httptest.NewRequest(http.MethodPost, "/subscriptions", bytes.NewReader(subBody))
+	reqSub.Header.Set("Content-Type", "application/json")
+	wSub := httptest.NewRecorder()
+	router.ServeHTTP(wSub, reqSub)
+	if wSub.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for subscription, got %d: %s", wSub.Code, wSub.Body.String())
+	}
+	var sub domain.Subscription
+	if err := json.NewDecoder(wSub.Body).Decode(&sub); err != nil {
+		t.Fatalf("failed to decode subscription: %v", err)
+	}
+	if sub.Status != domain.SubscriptionActive || !sub.CurrentPeriodEnd.After(sub.CurrentPeriodStart) {
+		t.Fatalf("unexpected subscription: %+v", sub)
+	}
+	reqSubList := httptest.NewRequest(http.MethodGet, "/subscriptions", nil)
+	wSubList := httptest.NewRecorder()
+	router.ServeHTTP(wSubList, reqSubList)
+	var subs []domain.Subscription
+	if err := json.NewDecoder(wSubList.Body).Decode(&subs); err != nil || len(subs) != 1 {
+		t.Fatalf("expected 1 subscription, got %+v / %v", subs, err)
+	}
+	reqCancel := httptest.NewRequest(http.MethodPost, "/subscriptions/"+sub.ID+"/cancel", nil)
+	wCancel := httptest.NewRecorder()
+	router.ServeHTTP(wCancel, reqCancel)
+	if wCancel.Code != http.StatusOK {
+		t.Fatalf("expected 200 for cancel, got %d: %s", wCancel.Code, wCancel.Body.String())
+	}
+	reqCancel2 := httptest.NewRequest(http.MethodPost, "/subscriptions/"+sub.ID+"/cancel", nil)
+	wCancel2 := httptest.NewRecorder()
+	router.ServeHTTP(wCancel2, reqCancel2)
+	if wCancel2.Code != http.StatusConflict {
+		t.Fatalf("expected 409 for second cancel, got %d: %s", wCancel2.Code, wCancel2.Body.String())
+	}
+
+	// 12. Checkout on non-pending order -> 409
+	reqCheckoutPaid := httptest.NewRequest(http.MethodPost, "/orders/"+createdOrder.ID+"/checkout", nil)
+	wCheckoutPaid := httptest.NewRecorder()
+	router.ServeHTTP(wCheckoutPaid, reqCheckoutPaid)
+	if wCheckoutPaid.Code != http.StatusConflict {
+		t.Fatalf("expected 409 for checkout on refunded order, got %d: %s", wCheckoutPaid.Code, wCheckoutPaid.Body.String())
 	}
 }
 

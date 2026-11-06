@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sort"
 	"sync"
 	"time"
 
@@ -27,6 +28,7 @@ type DistributionRepository interface {
 	CreateRelease(ctx context.Context, r *domain.AppRelease) error
 	GetRelease(ctx context.Context, id string) (*domain.AppRelease, error)
 	UpdateRelease(ctx context.Context, r *domain.AppRelease) error
+	ListReleasesByApp(ctx context.Context, appID string) ([]*domain.AppRelease, error)
 }
 
 type InMemoryDistributionRepo struct {
@@ -160,6 +162,20 @@ type ArtifactService struct {
 	repo             DistributionRepository
 	blacklistedCerts []string
 	mu               sync.RWMutex
+}
+
+func (r *InMemoryDistributionRepo) ListReleasesByApp(ctx context.Context, appID string) ([]*domain.AppRelease, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var out []*domain.AppRelease
+	for _, rel := range r.releases {
+		if rel.AppID == appID {
+			cp := *rel
+			out = append(out, &cp)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	return out, nil
 }
 
 func NewArtifactService(repo DistributionRepository, blacklistedCerts []string) *ArtifactService {
@@ -343,6 +359,77 @@ func (s *ArtifactService) TransitionReleaseStatus(ctx context.Context, releaseID
 		rel.PublishedAt = &now
 	}
 
+	if err := s.repo.UpdateRelease(ctx, rel); err != nil {
+		return nil, err
+	}
+	return rel, nil
+}
+
+// GetUploadSession returns an upload session by id.
+func (s *ArtifactService) GetUploadSession(ctx context.Context, id string) (*domain.UploadSession, error) {
+	return s.repo.GetUploadSession(ctx, id)
+}
+
+// GetRelease returns a release by id.
+func (s *ArtifactService) GetRelease(ctx context.Context, id string) (*domain.AppRelease, error) {
+	return s.repo.GetRelease(ctx, id)
+}
+
+// CreateRelease persists a new release draft.
+func (s *ArtifactService) CreateRelease(ctx context.Context, rel *domain.AppRelease) error {
+	return s.repo.CreateRelease(ctx, rel)
+}
+
+// ListReleasesByApp returns newest-first releases for an app.
+func (s *ArtifactService) ListReleasesByApp(ctx context.Context, appID string) ([]*domain.AppRelease, error) {
+	return s.repo.ListReleasesByApp(ctx, appID)
+}
+
+// LatestSignature returns the newest signature record for a distribution.
+func (s *ArtifactService) LatestSignature(ctx context.Context, distributionID string) (*domain.APKSignature, error) {
+	return s.repo.GetLatestSignatureByDistribution(ctx, distributionID)
+}
+
+// MarkUploadComplete moves an upload session to COMPLETED.
+func (s *ArtifactService) MarkUploadComplete(ctx context.Context, id string) error {
+	return s.repo.UpdateUploadSessionStatus(ctx, id, "COMPLETED")
+}
+
+// HaltRelease suspends distribution immediately with a recorded reason.
+func (s *ArtifactService) HaltRelease(ctx context.Context, releaseID, reason string) (*domain.AppRelease, error) {
+	rel, err := s.repo.GetRelease(ctx, releaseID)
+	if err != nil {
+		return nil, err
+	}
+	if err := domain.TransitionRelease(rel, domain.ReleaseHalted); err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	rel.HaltedAt = &now
+	rel.HaltReason = &reason
+	rel.UpdatedAt = now
+	if err := s.repo.UpdateRelease(ctx, rel); err != nil {
+		return nil, err
+	}
+	return rel, nil
+}
+
+// ResumeRelease returns a halted release to staged or full publication.
+func (s *ArtifactService) ResumeRelease(ctx context.Context, releaseID string) (*domain.AppRelease, error) {
+	rel, err := s.repo.GetRelease(ctx, releaseID)
+	if err != nil {
+		return nil, err
+	}
+	target := domain.ReleasePublishedStaged
+	if rel.RolloutPercentage >= 100 {
+		target = domain.ReleasePublishedFull
+	}
+	if err := domain.TransitionRelease(rel, target); err != nil {
+		return nil, err
+	}
+	rel.HaltedAt = nil
+	rel.HaltReason = nil
+	rel.UpdatedAt = time.Now().UTC()
 	if err := s.repo.UpdateRelease(ctx, rel); err != nil {
 		return nil, err
 	}

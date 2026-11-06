@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -64,6 +65,7 @@ func (r *InMemoryCatalogRepository) seedReferenceData() {
 		BayesianRating:     4.82,
 		InstallCount:       125000,
 		LicenseSPDX:        "Apache-2.0",
+		MonetizationType:   "FREE",
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}
@@ -148,6 +150,7 @@ func (r *InMemoryCatalogRepository) seedReferenceData() {
 		BayesianRating:     4.90,
 		InstallCount:       89000,
 		LicenseSPDX:        "MIT",
+		MonetizationType:   "FREE",
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}
@@ -233,6 +236,15 @@ func (r *InMemoryCatalogRepository) ListPublishedApps(ctx context.Context, filte
 		if filter.MinRating > 0 && app.AverageRating < filter.MinRating {
 			continue
 		}
+		if filter.FreeOnly && !isFreeMonetization(app.MonetizationType) {
+			continue
+		}
+		if filter.DirectOnly && !hasDirectDistribution(r.dists[app.ID]) {
+			continue
+		}
+		if q := strings.TrimSpace(filter.Query); q != "" && !matchesCatalogQuery(app, r.locs[app.ID], q) {
+			continue
+		}
 		if filter.TagID != "" {
 			hasTag := false
 			for _, t := range r.tags[app.ID] {
@@ -249,15 +261,146 @@ func (r *InMemoryCatalogRepository) ListPublishedApps(ctx context.Context, filte
 	}
 
 	sort.Slice(result, func(i, j int) bool {
-		return result[i].InstallCount > result[j].InstallCount
+		if result[i].BayesianRating != result[j].BayesianRating {
+			return result[i].BayesianRating > result[j].BayesianRating
+		}
+		if result[i].InstallCount != result[j].InstallCount {
+			return result[i].InstallCount > result[j].InstallCount
+		}
+		return result[i].ID < result[j].ID
 	})
 
-	limit := filter.Limit
-	if limit <= 0 || limit > len(result) {
-		limit = len(result)
+	if cr, ct, ci, ok := domain.DecodeListCursor(filter.Cursor); ok {
+		kept := result[:0]
+		for _, a := range result {
+			if domain.AfterCursor(a.BayesianRating, a.InstallCount, a.ID, cr, ct, ci) {
+				kept = append(kept, a)
+			}
+		}
+		result = kept
 	}
 
-	return result[:limit], "", nil
+	limit := filter.Limit
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	if len(result) > limit {
+		last := result[limit-1]
+		return result[:limit], domain.EncodeListCursor(last.BayesianRating, last.InstallCount, last.ID), nil
+	}
+	return result, "", nil
+}
+
+func isFreeMonetization(monetization string) bool {
+	switch strings.ToUpper(strings.TrimSpace(monetization)) {
+	case "", "FREE", "FREE_WITH_ADS", "FREE_WITH_IAP":
+		return true
+	default:
+		return false
+	}
+}
+
+func hasDirectDistribution(dists []domain.Distribution) bool {
+	for _, d := range dists {
+		if d.DistributionMode == domain.ModeDirectAPK || d.DistributionMode == "DIRECT_HOSTED" {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesCatalogQuery(app *domain.CatalogApp, locs []domain.Localization, q string) bool {
+	q = strings.ToLower(q)
+	if strings.Contains(strings.ToLower(app.CanonicalSlug), q) ||
+		strings.Contains(strings.ToLower(app.PrimaryPackageName), q) {
+		return true
+	}
+	for _, l := range locs {
+		if strings.Contains(strings.ToLower(l.Title), q) ||
+			strings.Contains(strings.ToLower(l.ShortDescription), q) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *InMemoryCatalogRepository) ListAppsByOrg(ctx context.Context, orgID string) ([]domain.CatalogApp, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var out []domain.CatalogApp
+	for _, app := range r.byID {
+		if app.DeveloperOrgID != nil && *app.DeveloperOrgID == orgID {
+			out = append(out, *app)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].UpdatedAt.After(out[j].UpdatedAt) })
+	return out, nil
+}
+
+func (r *InMemoryCatalogRepository) UpsertLocalization(ctx context.Context, loc domain.Localization) (*domain.Localization, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.byID[loc.AppID]; !ok {
+		return nil, domain.ErrAppNotFound
+	}
+	existing := r.locs[loc.AppID]
+	for i := range existing {
+		if strings.EqualFold(existing[i].Locale, loc.Locale) {
+			loc.ID = existing[i].ID
+			loc.AppID = existing[i].AppID
+			existing[i] = loc
+			r.locs[loc.AppID] = existing
+			cp := loc
+			return &cp, nil
+		}
+	}
+	if loc.ID == "" {
+		loc.ID = fmt.Sprintf("loc-%s-%s", loc.AppID, strings.ToLower(loc.Locale))
+	}
+	r.locs[loc.AppID] = append(existing, loc)
+	cp := loc
+	return &cp, nil
+}
+
+func (r *InMemoryCatalogRepository) GetAppByID(ctx context.Context, appID string) (*domain.CatalogApp, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	app, ok := r.byID[appID]
+	if !ok {
+		return nil, domain.ErrAppNotFound
+	}
+	cp := *app
+	return &cp, nil
+}
+
+func (r *InMemoryCatalogRepository) UpdateCatalogStatus(ctx context.Context, appID string, status domain.CatalogStatus) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	app, ok := r.byID[appID]
+	if !ok {
+		return domain.ErrAppNotFound
+	}
+	app.CatalogStatus = status
+	return nil
+}
+
+func (r *InMemoryCatalogRepository) ListAppsByStatus(ctx context.Context, statuses []domain.CatalogStatus) ([]domain.CatalogApp, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	want := make(map[domain.CatalogStatus]bool, len(statuses))
+	for _, s := range statuses {
+		want[s] = true
+	}
+	var out []domain.CatalogApp
+	for _, app := range r.byID {
+		if want[app.CatalogStatus] {
+			out = append(out, *app)
+		}
+	}
+	return out, nil
 }
 
 func (r *InMemoryCatalogRepository) GetAppBySlug(ctx context.Context, slug string) (*domain.CatalogApp, error) {
@@ -292,6 +435,33 @@ func (r *InMemoryCatalogRepository) GetMediaAssets(ctx context.Context, appID, l
 		}
 	}
 	return out, nil
+}
+
+func (r *InMemoryCatalogRepository) AddMediaAsset(ctx context.Context, asset domain.MediaAsset) (*domain.MediaAsset, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.byID[asset.AppID]; !ok {
+		return nil, domain.ErrAppNotFound
+	}
+	if asset.ID == "" {
+		asset.ID = fmt.Sprintf("media-%s-%d", asset.AppID, len(r.media[asset.AppID])+1)
+	}
+	r.media[asset.AppID] = append(r.media[asset.AppID], asset)
+	cp := asset
+	return &cp, nil
+}
+
+func (r *InMemoryCatalogRepository) DeleteMediaAsset(ctx context.Context, appID, assetID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	list := r.media[appID]
+	for i := range list {
+		if list[i].ID == assetID {
+			r.media[appID] = append(list[:i], list[i+1:]...)
+			return nil
+		}
+	}
+	return domain.ErrMediaAssetNotFound
 }
 
 func (r *InMemoryCatalogRepository) GetDistributions(ctx context.Context, appID string) ([]domain.Distribution, error) {

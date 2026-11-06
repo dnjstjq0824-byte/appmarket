@@ -60,35 +60,19 @@
           <label>Category</label>
           <select v-model="selectedCategory" @change="triggerSearch" class="facet-select">
             <option value="">All Categories</option>
-            <option value="TOOLS">Tools & Utilities</option>
-            <option value="FINANCE">Finance & Banking</option>
-            <option value="COMMUNICATION">Communication & Messaging</option>
-            <option value="PRODUCTIVITY">Productivity</option>
-            <option value="GAMES">Games</option>
+            <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
-        </div>
-
-        <div class="facet-group">
-          <label>Price</label>
-          <div class="filter-options">
-            <label class="radio-label">
-              <input type="radio" value="ALL" v-model="selectedPriceFilter" @change="triggerSearch" />
-              <span>All Prices</span>
-            </label>
-            <label class="radio-label">
-              <input type="radio" value="FREE" v-model="selectedPriceFilter" @change="triggerSearch" />
-              <span>Free Only</span>
-            </label>
-          </div>
         </div>
       </aside>
 
       <!-- Search Results Area -->
       <main class="results-main">
         <div class="results-summary">
-          <span v-if="!isLoading">
+          <span v-if="!isLoading && !loadError">
             Found <strong>{{ totalResults }}</strong> results for "<em>{{ activeQuery }}</em>" ({{ tookMs }}ms)
+            <span v-if="fallbackUsed" class="fallback-note">· fallback index</span>
           </span>
+          <span v-else-if="loadError" class="search-error">{{ loadError }}</span>
           <span v-else>Searching catalog...</span>
         </div>
 
@@ -129,7 +113,9 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { getSharedClient, ApiClientError, type SearchDoc, type SuggestionItem } from '@bookingnetwork/api-client';
 
+const api = getSharedClient();
 const route = useRoute();
 const router = useRouter();
 
@@ -139,10 +125,11 @@ const showSuggestions = ref(false);
 const isLoading = ref(false);
 const totalResults = ref(0);
 const tookMs = ref(0);
+const loadError = ref('');
+const fallbackUsed = ref(false);
 
 const selectedRightsFilter = ref('ALL');
 const selectedCategory = ref('');
-const selectedPriceFilter = ref('ALL');
 
 interface AppResultItem {
   appId: string;
@@ -157,78 +144,76 @@ interface AppResultItem {
   directDownloadAvailable: boolean;
 }
 
-const suggestions = ref<{ text: string; type: string; package?: string }[]>([]);
+const suggestions = ref<SuggestionItem[]>([]);
 const results = ref<AppResultItem[]>([]);
+const categories = ref<Array<{ id: string; name: string }>>([]);
+let suggestTimer: ReturnType<typeof setTimeout> | null = null;
+
+function titleOf(doc: SearchDoc): string {
+  return doc.title_i18n['ko-KR'] || doc.title_i18n['en-US'] || Object.values(doc.title_i18n)[0] || doc.package_name;
+}
+
+function descOf(doc: SearchDoc): string {
+  return doc.description_i18n['ko-KR'] || doc.description_i18n['en-US'] || Object.values(doc.description_i18n)[0] || '';
+}
 
 async function performRealSearch() {
   const query = searchQuery.value.trim();
   activeQuery.value = query;
   showSuggestions.value = false;
   isLoading.value = true;
-  const start = performance.now();
+  loadError.value = '';
 
   try {
-    let url = `/api/v1/catalog/apps?q=${encodeURIComponent(query)}`;
-    if (selectedCategory.value) {
-      url += `&category=${encodeURIComponent(selectedCategory.value.toLowerCase())}`;
-    }
-    if (selectedPriceFilter.value === 'FREE') {
-      url += `&price=free`;
-    }
-
-    const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
-      const rawApps = Array.isArray(data.apps) ? data.apps : [];
-
-      results.value = rawApps.map((a: any) => ({
-        appId: a.id || a.package_name,
-        slug: a.id || a.package_name,
-        title: a.title,
-        packageName: a.package_name,
-        developerName: a.developer_name,
-        category: a.category_name || a.category,
-        shortDescription: a.summary || a.description,
-        bayesianRating: a.rating || 4.8,
-        ratingCount: a.rating_count || 1200,
-        directDownloadAvailable: true
-      }));
-
-      totalResults.value = results.value.length;
-      tookMs.value = Math.max(1, Math.round(data.took_ms || (performance.now() - start)));
-    } else {
-      results.value = [];
-      totalResults.value = 0;
-      tookMs.value = Math.max(1, Math.round(performance.now() - start));
-    }
+    const extra: Record<string, string> = {};
+    if (selectedCategory.value) extra.category = selectedCategory.value;
+    if (selectedRightsFilter.value === 'DIRECT_ONLY') extra.direct_only = 'true';
+    const res = await api.searchApps(query, 20, extra);
+    results.value = (res.items || []).map((d) => ({
+      appId: d.app_id,
+      slug: d.app_id,
+      title: titleOf(d),
+      packageName: d.package_name,
+      developerName: d.developer_name,
+      category: d.category,
+      shortDescription: descOf(d),
+      bayesianRating: d.bayesian_rating,
+      ratingCount: d.rating_count,
+      directDownloadAvailable: d.direct_download_available
+    }));
+    totalResults.value = res.total_count;
+    tookMs.value = res.took_ms;
+    fallbackUsed.value = res.fallback_used;
+    void router.replace({ query: { ...route.query, q: query } }).catch(() => {});
   } catch (err) {
-    console.error('Catalog search failed:', err);
+    loadError.value = err instanceof ApiClientError ? err.message : 'Search failed';
     results.value = [];
     totalResults.value = 0;
-    tookMs.value = Math.max(1, Math.round(performance.now() - start));
   } finally {
     isLoading.value = false;
   }
 }
 
 function handleInput() {
-  if (searchQuery.value.length >= 2) {
-    showSuggestions.value = true;
-    const q = searchQuery.value.toLowerCase();
-    suggestions.value = [
-      { text: 'Omni Productivity Suite', type: 'APP', package: 'com.omniwork.office' },
-      { text: 'FinVault Secure Banking', type: 'APP', package: 'com.finvault.banking' },
-      { text: 'Cloud Authenticator 2FA', type: 'APP', package: 'com.shieldguard.auth2fa' },
-      { text: 'Secure Messenger Pro', type: 'APP', package: 'org.openprivacy.messenger' },
-      { text: 'Cyber Runner 2026', type: 'APP', package: 'com.neonpixel.cyberrunner' }
-    ].filter(s => s.text.toLowerCase().includes(q) || s.package?.toLowerCase().includes(q));
-  } else {
+  if (suggestTimer) clearTimeout(suggestTimer);
+  if (searchQuery.value.trim().length < 2) {
     showSuggestions.value = false;
     suggestions.value = [];
+    return;
   }
+  suggestTimer = setTimeout(async () => {
+    try {
+      const res = await api.suggestApps(searchQuery.value.trim(), 8);
+      suggestions.value = res.suggestions || [];
+      showSuggestions.value = suggestions.value.length > 0;
+    } catch {
+      suggestions.value = [];
+      showSuggestions.value = false;
+    }
+  }, 250);
 }
 
-function selectSuggestion(item: any) {
+function selectSuggestion(item: SuggestionItem) {
   searchQuery.value = item.text;
   showSuggestions.value = false;
   triggerSearch();
@@ -244,10 +229,16 @@ function clearSearch() {
   performRealSearch();
 }
 
-onMounted(() => {
+onMounted(async () => {
   const initialQ = (route.query.q as string) || '';
   if (initialQ) {
     searchQuery.value = initialQ;
+  }
+  try {
+    const cats = await api.getCategories();
+    categories.value = cats.map(c => ({ id: c.id, name: c.name_i18n['ko-KR'] || c.name_i18n['en-US'] || c.id }));
+  } catch {
+    categories.value = [];
   }
   performRealSearch();
 });
@@ -492,5 +483,7 @@ watch(() => route.query.q, (newQ) => {
 .text-muted { color: #94a3b8; }
 .text-xs { font-size: 11px; }
 .font-mono { font-family: monospace; }
+.fallback-note { color: #b45309; font-size: 12px; }
+.search-error { color: #dc2626; }
 </style>
 

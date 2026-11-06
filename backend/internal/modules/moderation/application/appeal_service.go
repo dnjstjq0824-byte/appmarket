@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/moderation/domain"
+	"github.com/bookingnetwork/appmarket/backend/internal/platform/sanitize"
 )
 
 type AppealService struct {
@@ -29,7 +30,7 @@ func (s *AppealService) SubmitAppeal(ctx context.Context, orgID, releaseID, reas
 		ID:                 appealID,
 		OrgID:              orgID,
 		ReleaseID:          releaseID,
-		Reason:             reason,
+		Reason:             sanitize.Strict(reason),
 		OriginalReviewerID: originalReviewerID,
 		Status:             domain.AppealPending,
 		CreatedAt:          time.Now().UTC(),
@@ -37,6 +38,16 @@ func (s *AppealService) SubmitAppeal(ctx context.Context, orgID, releaseID, reas
 
 	s.appeals[appealID] = appeal
 	return appeal, nil
+}
+
+func (s *AppealService) ListAppeals() []domain.DeveloperAppeal {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]domain.DeveloperAppeal, 0, len(s.appeals))
+	for _, a := range s.appeals {
+		out = append(out, *a)
+	}
+	return out
 }
 
 // DecideAppeal enforces Dual-Control: Original reviewer cannot judge their own appeal (TC-FUNC-013)
@@ -57,7 +68,7 @@ func (s *AppealService) DecideAppeal(ctx context.Context, appealID, reviewerID s
 	now := time.Now().UTC()
 	appeal.AssignedReviewerID = reviewerID
 	appeal.Status = decision
-	appeal.DecisionNotes = notes
+	appeal.DecisionNotes = sanitize.Strict(notes)
 	appeal.DecidedAt = &now
 
 	return appeal, nil

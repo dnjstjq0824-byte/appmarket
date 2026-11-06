@@ -14,7 +14,7 @@
           <span>PackageInstaller 원클릭 설치 및 백그라운드 자동 업데이트 지원 (Android 12+ 패키지 소유권 준수)</span>
         </div>
         <button class="banner-download-btn" @click="downloadCompanionApp">
-          앱 설치 (APK)
+          스토어에서 찾기
         </button>
       </div>
     </div>
@@ -113,12 +113,12 @@
             <div class="suggestions-label">추천 검색어</div>
             <div
               v-for="item in quickSuggestions"
-              :key="item"
+              :key="item.type + ':' + item.text"
               class="suggestion-item"
               @mousedown.prevent="selectSuggestion(item)"
             >
               <span class="suggestion-icon">🔍</span>
-              <span>{{ item }}</span>
+              <span>{{ item.text }}</span>
             </div>
           </div>
         </div>
@@ -143,22 +143,29 @@
 
             <!-- Profile Popover Modal (Google Style) -->
             <div v-if="profileMenuOpen" class="user-profile-popover" @click.stop>
-              <div class="popover-header">
-                <div class="popover-avatar">BN</div>
+              <div v-if="loggedIn" class="popover-header">
+                <div class="popover-avatar">{{ (profileName || 'U').slice(0, 1).toUpperCase() }}</div>
                 <div class="popover-user-info">
-                  <div class="popover-name">BookingNetwork User</div>
-                  <div class="popover-email">user@bookingnetwork.com</div>
-                  <span class="popover-badge">EU DMA Verified Direct Account</span>
+                  <div class="popover-name">{{ profileName }}</div>
+                  <div class="popover-email">{{ profileEmail }}</div>
+                </div>
+              </div>
+              <div v-else class="popover-header">
+                <div class="popover-user-info">
+                  <div class="popover-name">로그인이 필요합니다</div>
+                  <NuxtLink to="/account/login" class="popover-item" @click="profileMenuOpen = false">
+                    <span class="popover-item-icon">🔑</span> 로그인 / 회원가입
+                  </NuxtLink>
                 </div>
               </div>
 
-              <div class="popover-section">
+              <div v-if="loggedIn" class="popover-section">
                 <NuxtLink to="/account/library" class="popover-item" @click="profileMenuOpen = false">
                   <span class="popover-item-icon">📦</span> 내 앱 및 게임 (보관함)
                 </NuxtLink>
-                <a href="#payments" class="popover-item" @click="profileMenuOpen = false">
+                <NuxtLink to="/account/library" class="popover-item" @click="profileMenuOpen = false">
                   <span class="popover-item-icon">💳</span> 결제 및 정산 내역
-                </a>
+                </NuxtLink>
               </div>
 
               <div class="popover-divider"></div>
@@ -182,6 +189,7 @@
               </div>
 
               <div class="popover-footer">
+                <button v-if="loggedIn" class="popover-signout-btn" @click="signOut">로그아웃</button>
                 <button class="popover-signout-btn" @click="profileMenuOpen = false">닫기</button>
               </div>
             </div>
@@ -234,9 +242,9 @@
           <div class="footer-col">
             <h4>법적 고지 및 정책</h4>
             <ul>
-              <li><a href="#terms">서비스 이용약관</a></li>
-              <li><a href="#privacy">개인정보 처리방침</a></li>
-              <li><a href="#devpolicy">개발자 유통 계약 및 수수료 정책</a></li>
+              <li><NuxtLink to="/legal/terms">서비스 이용약관</NuxtLink></li>
+              <li><NuxtLink to="/legal/privacy">개인정보 처리방침</NuxtLink></li>
+              <li><NuxtLink to="/legal/terms">개발자 유통 계약 및 수수료 정책</NuxtLink></li>
               <li><a href="#consumer">전자상거래 소비자 보호 안내</a></li>
             </ul>
           </div>
@@ -251,9 +259,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { getSharedClient, clearSession, type SuggestionItem } from '@bookingnetwork/api-client'
 
+const api = getSharedClient()
 const router = useRouter()
 const showSmartBanner = ref(true)
 const currentTheme = ref<'light' | 'dark'>('dark')
@@ -261,29 +271,54 @@ const activeTopTab = ref<'games' | 'apps' | 'charts' | 'editors' | 'protect'>('a
 const searchQuery = ref('')
 const searchFocused = ref(false)
 const profileMenuOpen = ref(false)
+const quickSuggestions = ref<SuggestionItem[]>([])
+const profileEmail = ref('')
+const profileName = ref('')
+const loggedIn = ref(false)
+let suggestTimer: ReturnType<typeof setTimeout> | null = null
 
-function downloadCompanionApp() {
-  if (typeof window !== 'undefined') {
-    const dummyApk = `PK\x03\x04# BookingNetwork Mobile Companion App\nPackage: com.bookingnetwork.appmarket.companion\nVersion: 2.0.0\n`
-    const blob = new Blob([dummyApk], { type: 'application/vnd.android.package-archive' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `BookingNetwork-Companion-v2.0.0.apk`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+async function downloadCompanionApp() {
+  await router.push('/search?q=companion')
+}
+
+async function refreshSuggestions(q: string) {
+  const query = q.trim()
+  if (query.length < 2) {
+    quickSuggestions.value = []
+    return
+  }
+  try {
+    const res = await api.suggestApps(query, 6)
+    quickSuggestions.value = res.suggestions || []
+  } catch {
+    quickSuggestions.value = []
   }
 }
 
-const quickSuggestions = [
-  'Omni Productivity Suite',
-  'FinVault Secure Banking',
-  'Secure Messenger Pro',
-  'Cloud Authenticator 2FA',
-  'Cyber Runner 2026'
-]
+watch(searchQuery, (q) => {
+  if (suggestTimer) clearTimeout(suggestTimer)
+  suggestTimer = setTimeout(() => { void refreshSuggestions(q) }, 250)
+})
+
+async function refreshProfile() {
+  try {
+    const me = await api.getMe()
+    loggedIn.value = true
+    profileEmail.value = me.email
+    profileName.value = me.email.split('@')[0]
+  } catch {
+    loggedIn.value = false
+    profileEmail.value = ''
+    profileName.value = ''
+  }
+}
+
+function signOut() {
+  clearSession()
+  loggedIn.value = false
+  profileMenuOpen.value = false
+  void router.push('/')
+}
 
 function switchTopTab(tab: 'games' | 'apps' | 'charts' | 'editors' | 'protect') {
   activeTopTab.value = tab
@@ -303,8 +338,8 @@ function executeSearch() {
   }
 }
 
-function selectSuggestion(item: string) {
-  searchQuery.value = item
+function selectSuggestion(item: SuggestionItem) {
+  searchQuery.value = item.text
   executeSearch()
 }
 
@@ -332,6 +367,7 @@ onMounted(() => {
     }
     document.documentElement.setAttribute('data-theme', currentTheme.value)
   }
+  void refreshProfile()
 })
 </script>
 

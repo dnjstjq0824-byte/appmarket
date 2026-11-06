@@ -11,9 +11,9 @@
       </div>
 
       <div class="bn-topbar-metrics">
-        <div class="bn-status-pill">
+        <div class="bn-status-pill" :class="healthClass">
           <span class="bn-pulse-dot"></span>
-          <span>Cluster Healthy (QPS: 1,482)</span>
+          <span>{{ healthText }}</span>
         </div>
         <div class="bn-dual-control-pill">
           <span>Dual-Control: <strong>ACTIVE</strong></span>
@@ -21,59 +21,22 @@
       </div>
 
       <div class="bn-topbar-actions">
-        <a href="/" class="bn-nav-link-btn" title="사용자 마켓으로 이동">🛒 User Store</a>
-        <a href="/developer/" class="bn-nav-link-btn" title="개발자 콘솔로 이동">💻 Dev Portal</a>
-        
-        <div v-if="isAuthenticated && currentAdmin" class="bn-admin-user">
-          <div class="bn-avatar">{{ currentAdmin.avatar }}</div>
+        <a href="/" class="bn-nav-link-btn" title="사용자 마켓으로 이동">User Store</a>
+        <a href="/developer/" class="bn-nav-link-btn" title="개발자 콘솔로 이동">Dev Portal</a>
+
+        <div v-if="currentAdmin" class="bn-admin-user">
+          <div class="bn-avatar">{{ adminInitials }}</div>
           <div class="bn-user-info">
-            <span class="bn-user-name">{{ currentAdmin.name }}</span>
-            <span class="bn-user-role">{{ currentAdmin.roleName }} ({{ currentAdmin.id }})</span>
+            <span class="bn-user-name">{{ currentAdmin.email }}</span>
+            <span class="bn-user-role">{{ currentAdmin.roles.join(', ') }}</span>
           </div>
           <button @click="logoutAdmin" class="bn-logout-btn" title="관리자 세션 로그아웃">로그아웃</button>
         </div>
         <div v-else class="bn-admin-user">
-          <button @click="showAuthModal = true" class="bn-login-btn">🔐 관리자 인증</button>
+          <router-link to="/login" class="bn-login-btn">관리자 인증</router-link>
         </div>
       </div>
     </header>
-
-    <!-- Authentication Gate Modal when not authenticated -->
-    <div v-if="!isAuthenticated && showAuthModal" class="bn-auth-gate-overlay">
-      <div class="bn-auth-card">
-        <div class="bn-auth-header">
-          <span class="bn-auth-shield">🛡️</span>
-          <h3>BookingNetwork 관리자 보안 인증</h3>
-          <p>관리자 콘솔 접근을 위해 승인된 직무 역할로 인증해야 합니다. (Zero-Trust IAM Enforcement)</p>
-        </div>
-
-        <div class="bn-role-options">
-          <div 
-            v-for="role in availableRoles" 
-            :key="role.id" 
-            class="bn-role-card" 
-            :class="{ active: selectedRole?.id === role.id }"
-            @click="selectedRole = role"
-          >
-            <div class="bn-role-card-header">
-              <strong>{{ role.name }}</strong>
-              <span class="bn-role-badge">{{ role.id }}</span>
-            </div>
-            <p>{{ role.description }}</p>
-          </div>
-        </div>
-
-        <div class="bn-auth-actions">
-          <button 
-            class="bn-btn-primary" 
-            :disabled="!selectedRole"
-            @click="authenticateAs(selectedRole!)"
-          >
-            선택한 직무로 관리자 세션 시작
-          </button>
-        </div>
-      </div>
-    </div>
 
     <div class="bn-admin-body">
       <!-- Left Navigation Sidebar -->
@@ -124,6 +87,10 @@
             <span class="bn-nav-icon">🔌</span>
             <span>외부 미러 커넥터</span>
           </router-link>
+          <router-link to="/verifications" class="bn-nav-item" active-class="active">
+            <span class="bn-nav-icon">✅</span>
+            <span>조직 KYB 심사</span>
+          </router-link>
         </div>
 
         <div class="bn-nav-group">
@@ -157,73 +124,73 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { getSharedClient, clearSession, isAuthenticated } from '@bookingnetwork/api-client';
 
-interface AdminRole {
-  id: string;
-  name: string;
-  roleName: string;
-  avatar: string;
-  description: string;
+const router = useRouter();
+const api = getSharedClient();
+
+interface AdminSession {
+  sub: string;
+  email: string;
+  roles: string[];
 }
 
-const availableRoles: AdminRole[] = [
-  {
-    id: 'admin_sec_01',
-    name: 'Security Lead (SA)',
-    roleName: 'Security Officer & Super Admin',
-    avatar: 'SA',
-    description: '전체 클러스터 보안 검역, 악성 APK 바이너리 영구 차단(Kill-Switch) 및 1차 승인 권한'
-  },
-  {
-    id: 'admin_finance_02',
-    name: 'Finance Auditor 02',
-    roleName: 'Settlement & Finance Auditor',
-    avatar: 'FA',
-    description: '대규모 개발자 정산 및 환불 2차 최종 지급 승인 권한 (Four-Eyes Principle 준수)'
-  }
-];
+const currentAdmin = ref<AdminSession | null>(null);
+const healthText = ref('Cluster status: checking…');
+const healthClass = ref('');
 
-const selectedRole = ref<AdminRole | null>(availableRoles[0]);
-const isAuthenticated = ref(false);
-const showAuthModal = ref(false);
-const currentAdmin = ref<AdminRole | null>(null);
+const adminInitials = computed(() => {
+  const email = currentAdmin.value?.email || 'AD';
+  const name = email.split('@')[0];
+  return name.slice(0, 2).toUpperCase();
+});
 
-function authenticateAs(role: AdminRole) {
-  currentAdmin.value = role;
-  isAuthenticated.value = true;
-  showAuthModal.value = false;
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('bn_admin_token', `token_${role.id}_${Date.now()}`);
-    localStorage.setItem('bn_admin_profile', JSON.stringify(role));
-  }
+function isAdminSession(roles: string[]): boolean {
+  return roles.some(r => r === 'ADMIN_SUPER' || r.startsWith('ADMIN_'));
 }
 
-function logoutAdmin() {
-  isAuthenticated.value = false;
+async function logoutAdmin() {
   currentAdmin.value = null;
-  showAuthModal.value = true;
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('bn_admin_token');
-    localStorage.removeItem('bn_admin_profile');
-  }
+  clearSession();
+  await router.push('/login');
 }
 
-onMounted(() => {
-  if (typeof window !== 'undefined') {
-    const savedToken = localStorage.getItem('bn_admin_token');
-    const savedProfile = localStorage.getItem('bn_admin_profile');
-    if (savedToken && savedProfile) {
-      try {
-        currentAdmin.value = JSON.parse(savedProfile);
-        isAuthenticated.value = true;
-      } catch {
-        showAuthModal.value = true;
-      }
+onMounted(async () => {
+  try {
+    const res = await fetch('/healthz/ready');
+    const body = await res.json().catch(() => ({})) as Record<string, string>;
+    const entries = Object.entries(body);
+    if (entries.length === 0) {
+      healthText.value = 'Cluster Unreachable';
+      healthClass.value = 'degraded';
     } else {
-      // Prompt auth
-      showAuthModal.value = true;
+      const down = entries.filter(([, v]) => v !== 'UP');
+      if (down.length === 0) {
+        healthText.value = 'Cluster Healthy';
+        healthClass.value = 'healthy';
+      } else {
+        healthText.value = `Degraded: ${down.map(([k]) => k).join(', ')}`;
+        healthClass.value = 'degraded';
+      }
     }
+  } catch {
+    healthText.value = 'Cluster Unreachable';
+    healthClass.value = 'degraded';
+  }
+  if (!isAuthenticated()) {
+    return;
+  }
+  try {
+    const me = await api.getMe();
+    if (!isAdminSession(me.roles || [])) {
+      await logoutAdmin();
+      return;
+    }
+    currentAdmin.value = { sub: me.sub, email: me.email, roles: me.roles || [] };
+  } catch {
+    await logoutAdmin();
   }
 });
 </script>
@@ -317,6 +284,17 @@ body {
   background-color: #10b981;
   border-radius: 50%;
   box-shadow: 0 0 8px #10b981;
+}
+
+.bn-status-pill.degraded {
+  background-color: #451a03;
+  color: #fbbf24;
+  border-color: #b45309;
+}
+
+.bn-status-pill.degraded .bn-pulse-dot {
+  background-color: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
 }
 
 .bn-dual-control-pill {
@@ -512,6 +490,8 @@ body {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
 }
 
 .bn-auth-gate-overlay {

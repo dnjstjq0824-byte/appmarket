@@ -4,7 +4,7 @@
     <div class="category-pills-bar">
       <div class="category-pills-container">
         <button
-          v-for="cat in categories"
+          v-for="cat in categoryList"
           :key="cat.id"
           class="cat-chip-btn"
           :class="{ active: selectedCategory === cat.id }"
@@ -36,10 +36,10 @@
               <h2 class="billboard-title">{{ banner.title }}</h2>
               <p class="billboard-subtitle">{{ banner.subtitle }}</p>
               <div class="billboard-meta-row">
-                <div class="billboard-app-icon" v-html="banner.app.iconSvg"></div>
+                <div class="billboard-app-icon"><img :src="banner.app.icon_url" :alt="banner.app.title" width="56" height="56" /></div>
                 <div class="billboard-app-info">
                   <div class="app-info-title">{{ banner.app.title }}</div>
-                  <div class="app-info-dev">{{ banner.app.developer_name }} • ★ {{ banner.app.rating }}</div>
+                  <div class="app-info-dev">{{ banner.app.developer_name }} • ★ {{ banner.app.rating.toFixed(1) }}</div>
                 </div>
               </div>
               <div class="billboard-actions">
@@ -56,7 +56,7 @@
             <div class="billboard-graphic">
               <div class="device-mockup-frame">
                 <div class="mockup-header-notch"></div>
-                <div class="mockup-screen" v-html="banner.graphicSvg"></div>
+                <div class="mockup-screen"><img :src="banner.app.icon_url" :alt="banner.app.title" /></div>
               </div>
             </div>
           </div>
@@ -106,24 +106,27 @@
         <button class="see-all-btn" @click="selectedCategory = 'all'">전체보기 →</button>
       </div>
 
-      <div class="horizontal-scroll-container">
+      <div v-if="isLoading" class="home-status">카탈로그를 불러오는 중…</div>
+      <div v-if="loadError" class="home-status home-error">{{ loadError }}</div>
+      <div v-if="!isLoading && !loadError && filteredRecommendedApps.length === 0" class="home-status">표시할 앱이 없습니다.</div>
+      <div v-if="!isLoading && !loadError" class="horizontal-scroll-container">
         <div
           v-for="app in filteredRecommendedApps"
           :key="app.id"
           class="play-app-card"
           @click="openAppDetail(app)"
         >
-          <div class="card-icon-squircle" v-html="app.iconSvg"></div>
+          <div class="card-icon-squircle"><img :src="app.icon_url" :alt="app.title" width="56" height="56" /></div>
           <div class="card-content">
             <h3 class="card-title">{{ app.title }}</h3>
             <div class="card-dev">{{ app.developer_name }}</div>
             <div class="card-meta">
-              <span class="card-rating">★ {{ app.rating }}</span>
-              <span class="card-size">{{ app.size_formatted }}</span>
+              <span class="card-rating">★ {{ app.rating.toFixed(1) }}</span>
+              <span class="card-size">{{ fmtCount(app.install_count) }} 설치</span>
             </div>
             <div class="card-action-row">
               <span class="card-price" :class="{ free: app.is_free }">
-                {{ app.is_free ? '무료' : `₩${app.price_krw.toLocaleString()}` }}
+                {{ app.is_free ? '무료' : '유료' }}
               </span>
               <button class="mini-install-btn" @click.stop="triggerQuickInstall(app)">
                 설치
@@ -146,28 +149,30 @@
           <button
             class="chart-tab-btn"
             :class="{ active: chartTab === 'free' }"
-            @click="chartTab = 'free'"
+            @click="switchChart('free')"
           >
             인기 무료
           </button>
           <button
             class="chart-tab-btn"
             :class="{ active: chartTab === 'grossing' }"
-            @click="chartTab = 'grossing'"
+            @click="switchChart('grossing')"
           >
             최고 매출
           </button>
           <button
             class="chart-tab-btn"
             :class="{ active: chartTab === 'trending' }"
-            @click="chartTab = 'trending'"
+            @click="switchChart('trending')"
           >
             급상승
           </button>
         </div>
       </div>
 
-      <div class="top-charts-grid">
+      <div v-if="chartLoading" class="home-status">차트를 불러오는 중…</div>
+      <div v-if="!chartLoading && chartFilteredApps.length === 0" class="home-status">차트 데이터가 없습니다.</div>
+      <div v-if="!chartLoading" class="top-charts-grid">
         <div
           v-for="(app, idx) in chartFilteredApps"
           :key="app.id"
@@ -175,19 +180,19 @@
           @click="openAppDetail(app)"
         >
           <div class="chart-rank-number" :class="`rank-${idx + 1}`">{{ idx + 1 }}</div>
-          <div class="chart-icon-squircle" v-html="app.iconSvg"></div>
+          <div class="chart-icon-squircle"><img :src="app.icon_url" :alt="app.title" width="56" height="56" /></div>
           <div class="chart-info">
             <h4 class="chart-app-title">{{ app.title }}</h4>
             <div class="chart-app-dev">{{ app.developer_name }}</div>
             <div class="chart-app-meta">
-              <span>★ {{ app.rating }}</span>
+              <span>★ {{ app.rating.toFixed(1) }}</span>
               <span>• {{ app.category_name }}</span>
-              <span>• {{ app.downloads }}</span>
+              <span>• {{ fmtCount(app.install_count) }}</span>
             </div>
           </div>
           <div class="chart-btn-box">
             <button class="pill-install-btn" @click.stop="triggerQuickInstall(app)">
-              {{ app.is_free ? '설치' : `₩${app.price_krw.toLocaleString()}` }}
+              {{ app.is_free ? '설치' : '유료' }}
             </button>
           </div>
         </div>
@@ -206,10 +211,10 @@
             중단 없는 투명한 애플리케이션 라이프사이클을 제공합니다.
           </p>
           <div class="editorial-app-strip" v-if="allApps[0]" @click="openAppDetail(allApps[0])">
-            <div class="editorial-app-icon" v-html="allApps[0].iconSvg"></div>
+            <div class="editorial-app-icon"><img :src="allApps[0].icon_url" :alt="allApps[0].title" width="56" height="56" /></div>
             <div class="editorial-app-text">
               <strong>{{ allApps[0].title }}</strong>
-              <span>{{ allApps[0].developer_name }} • 에디터 추천 별점 4.9</span>
+              <span>{{ allApps[0].developer_name }} • 별점 {{ allApps[0].rating.toFixed(1) }}</span>
             </div>
             <button class="play-btn-install mini" @click.stop="triggerQuickInstall(allApps[0])">설치</button>
           </div>
@@ -235,20 +240,20 @@
           </div>
         </div>
 
-        <div class="modal-scroll-body">
+        <div v-if="modalLoading" class="home-status">앱 정보를 불러오는 중…</div>
+        <div v-else class="modal-scroll-body">
           <!-- App Profile Header -->
           <div class="detail-header-row">
-            <div class="detail-icon-large" v-html="selectedApp.iconSvg"></div>
+            <div class="detail-icon-large"><img :src="selectedApp.icon_url" :alt="selectedApp.title" width="72" height="72" /></div>
             <div class="detail-title-col">
               <h1 class="detail-app-name">{{ selectedApp.title }}</h1>
               <div class="detail-developer-row">
-                <a href="#dev" class="dev-link">{{ selectedApp.developer_name }}</a>
-                <span class="verified-check" title="인증된 합법 개발사">✓</span>
+                <span class="dev-link">{{ selectedApp.developer_name }}</span>
               </div>
               <div class="detail-badges-row">
                 <span class="badge-category">{{ selectedApp.category_name }}</span>
-                <span class="badge-iap">인앱 구매 제공</span>
-                <span class="badge-signature">{{ selectedApp.signature_scheme }}</span>
+                <span class="badge-iap">{{ selectedApp.is_free ? '무료' : selectedApp.price_label }}</span>
+                <span class="badge-signature">{{ selectedApp.license_spdx || selectedApp.monetization }}</span>
               </div>
             </div>
           </div>
@@ -257,15 +262,15 @@
           <div class="stats-ribbon">
             <div class="stat-column">
               <div class="stat-top">
-                <span class="stat-val">{{ selectedApp.rating }}</span>
+                <span class="stat-val">{{ selectedApp.rating.toFixed(1) }}</span>
                 <span class="stat-star">★</span>
               </div>
-              <div class="stat-bottom">{{ selectedApp.rating_count.toLocaleString() }}개 리뷰</div>
+              <div class="stat-bottom">{{ modalReviews.length }}개 리뷰</div>
             </div>
             <div class="stat-divider"></div>
             <div class="stat-column">
               <div class="stat-top">
-                <span class="stat-val">{{ selectedApp.downloads }}</span>
+                <span class="stat-val">{{ fmtCount(selectedApp.install_count) }}</span>
               </div>
               <div class="stat-bottom">다운로드</div>
             </div>
@@ -279,7 +284,7 @@
             <div class="stat-divider"></div>
             <div class="stat-column">
               <div class="stat-top">
-                <span class="badge-pegi">전체이용가</span>
+                <span class="badge-pegi">{{ selectedApp.content_rating }}</span>
               </div>
               <div class="stat-bottom">연령 등급</div>
             </div>
@@ -289,36 +294,39 @@
           <div class="install-action-container">
             <button
               class="primary-install-cta"
-              :class="{ downloading: isDownloading, installed: isInstalled }"
-              :disabled="isDownloading"
-              @click="handleInstallClick(selectedApp)"
+              :class="{ downloading: isDownloading, installed: hasDownloaded }"
+              :disabled="isDownloading || !selectedApp.release_id"
+              @click="handleInstallClick()"
             >
               <template v-if="isDownloading">
                 <span class="spinner-ring"></span>
                 <span>보안 검증 및 다운로드 중 ({{ downloadProgress }}%)...</span>
               </template>
-              <template v-else-if="isInstalled">
-                <span>✓ 설치 완료 (열기)</span>
+              <template v-else-if="hasDownloaded">
+                <span>✓ 다운로드 시작됨 (SHA-256 확인)</span>
+              </template>
+              <template v-else-if="!selectedApp.release_id">
+                <span>배포된 릴리스 없음</span>
               </template>
               <template v-else>
-                <span>{{ selectedApp.is_free ? '설치' : `₩${selectedApp.price_krw.toLocaleString()} 에 구매` }}</span>
+                <span>{{ selectedApp.is_free ? '설치' : `${selectedApp.price_label} 에 구매` }}</span>
               </template>
             </button>
             <span class="install-footnote">
-              🔒 TreeScan™ 0-Day 악성코드 검역 완료 및 15분 만료 보안 스트리밍 토큰 적용
+              🔒 서명된 다운로드 URL(15분 만료) · SHA-256 체크섬 제공
             </span>
           </div>
 
           <!-- Phone Screenshots Carousel (Google Play Style) -->
-          <div class="screenshots-section">
+          <div v-if="selectedApp.media.length > 0" class="screenshots-section">
             <h3 class="detail-section-title">스크린샷 미리보기</h3>
             <div class="screenshots-carousel">
               <div
-                v-for="(screen, sIdx) in getAppScreenshots(selectedApp)"
-                :key="sIdx"
+                v-for="shot in selectedApp.media"
+                :key="shot.url"
                 class="screenshot-phone-frame"
               >
-                <div class="phone-screen-inner" v-html="screen"></div>
+                <img class="phone-screen-inner" :src="shot.url" :alt="selectedApp.title" loading="lazy" />
               </div>
             </div>
           </div>
@@ -326,19 +334,18 @@
           <!-- About This App (Detailed Description) -->
           <div class="about-app-section">
             <h3 class="detail-section-title">앱 정보</h3>
-            <p class="about-description">{{ selectedApp.description }}</p>
+            <p class="about-description">{{ selectedApp.description || '등록된 설명이 없습니다.' }}</p>
 
-            <div class="update-notes-card">
+            <div v-if="selectedApp.whats_new" class="update-notes-card">
               <div class="update-notes-header">
                 <strong>버전 {{ selectedApp.version_name }}의 새로운 기능</strong>
-                <span>최근 업데이트: 2026년 10월 30일</span>
+                <span v-if="selectedApp.published_at">게시: {{ selectedApp.published_at.slice(0, 10) }}</span>
               </div>
-              <ul class="update-bullets">
-                <li>Android 15 (API 35) 및 16k Page Size 완전 대응 최적화</li>
-                <li>TreeScan 정적 AST 바이트코드 무결성 서명 계통 갱신</li>
-                <li>종단간 암호화(E2EE) 동기화 성능 40% 향상</li>
-              </ul>
+              <p class="about-description">{{ selectedApp.whats_new }}</p>
             </div>
+            <p v-if="selectedApp.privacy_url" class="about-description">
+              <a :href="selectedApp.privacy_url" target="_blank" rel="noopener">개인정보처리방침</a>
+            </p>
           </div>
 
           <!-- Data Safety & Privacy Nutrition Label -->
@@ -362,8 +369,8 @@
               <div class="safety-item">
                 <span class="safety-icon">🛡️</span>
                 <div>
-                  <strong>V3 서명 연속성 보장</strong>
-                  <p>인증서 계통이 변조되지 않았음을 확인하는 SHA-256 서명 지문 일치 검사를 완료했습니다.</p>
+                  <strong>서명 인증서 지문</strong>
+                  <p>{{ selectedApp.cert_short ? `SHA-256: ${selectedApp.cert_short}…` : '등록된 서명 정보가 없습니다.' }}</p>
                 </div>
               </div>
             </div>
@@ -374,65 +381,32 @@
             <h3 class="detail-section-title">평점 및 리뷰</h3>
             <div class="ratings-overview-card">
               <div class="rating-big-col">
-                <div class="big-score">{{ selectedApp.rating }}</div>
+                <div class="big-score">{{ selectedApp.rating.toFixed(1) }}</div>
                 <div class="stars-gold">★★★★★</div>
-                <div class="total-reviews-count">{{ selectedApp.rating_count.toLocaleString() }}개의 평점</div>
+                <div class="total-reviews-count">{{ modalReviews.length }}개의 평점</div>
               </div>
               <div class="histogram-col">
-                <div class="hist-row">
-                  <span>5</span>
-                  <div class="hist-bar-bg"><div class="hist-bar-fill" style="width: 82%;"></div></div>
-                </div>
-                <div class="hist-row">
-                  <span>4</span>
-                  <div class="hist-bar-bg"><div class="hist-bar-fill" style="width: 12%;"></div></div>
-                </div>
-                <div class="hist-row">
-                  <span>3</span>
-                  <div class="hist-bar-bg"><div class="hist-bar-fill" style="width: 4%;"></div></div>
-                </div>
-                <div class="hist-row">
-                  <span>2</span>
-                  <div class="hist-bar-bg"><div class="hist-bar-fill" style="width: 1%;"></div></div>
-                </div>
-                <div class="hist-row">
-                  <span>1</span>
-                  <div class="hist-bar-bg"><div class="hist-bar-fill" style="width: 1%;"></div></div>
+                <div v-for="row in reviewHistogram" :key="row.stars" class="hist-row">
+                  <span>{{ row.stars }}</span>
+                  <div class="hist-bar-bg"><div class="hist-bar-fill" :style="{ width: row.pct + '%' }"></div></div>
                 </div>
               </div>
             </div>
 
             <!-- User Review Cards -->
-            <div class="user-reviews-list">
-              <div class="review-card">
+            <div v-if="modalReviews.length === 0" class="home-status">아직 등록된 리뷰가 없습니다.</div>
+            <div v-else class="user-reviews-list">
+              <div v-for="rev in modalReviews" :key="rev.id" class="review-card">
                 <div class="review-author-row">
-                  <div class="review-avatar">김</div>
+                  <div class="review-avatar">{{ rev.title.slice(0, 1) || '★' }}</div>
                   <div class="review-author-info">
-                    <strong>김*호</strong>
-                    <span class="review-date">2026년 10월 28일</span>
+                    <strong>{{ rev.title || '제목 없음' }}</strong>
+                    <span class="review-date">{{ rev.created_at.slice(0, 10) }}</span>
                   </div>
-                  <div class="review-stars">★★★★★</div>
+                  <div class="review-stars">{{ '★'.repeat(rev.rating) + '☆'.repeat(5 - rev.rating) }}</div>
                 </div>
-                <p class="review-body">
-                  구글 플레이에서 독립 배포 버전으로 갈아탔는데 광고 트래커도 전혀 없고 백그라운드 배터리 소모가 눈에 띄게 줄었습니다.
-                  UI도 깔끔하고 무엇보다 무결성 서명 검증이 표시되어 안심하고 사용 중입니다.
-                </p>
-                <div class="review-helpful">이 리뷰가 유용했나요? • <strong>👍 342명</strong>이 유용하다고 평가함</div>
-              </div>
-
-              <div class="review-card">
-                <div class="review-author-row">
-                  <div class="review-avatar">P</div>
-                  <div class="review-author-info">
-                    <strong>Park J.</strong>
-                    <span class="review-date">2026년 10월 24일</span>
-                  </div>
-                  <div class="review-stars">★★★★★</div>
-                </div>
-                <p class="review-body">
-                  문서 편집 및 클라우드 동기화 속도가 타사 앱 대비 압도적입니다. 독립 마켓에서 이런 고품질 앱을 공식적으로 설치할 수 있어서 너무 좋습니다.
-                </p>
-                <div class="review-helpful">이 리뷰가 유용했나요? • <strong>👍 189명</strong>이 유용하다고 평가함</div>
+                <p class="review-body">{{ rev.comment }}</p>
+                <div v-if="rev.is_verified_install" class="review-helpful">✓ 설치 확인된 리뷰</div>
               </div>
             </div>
           </div>
@@ -448,289 +422,236 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { getSharedClient, type CatalogAppItem } from '@bookingnetwork/api-client'
 
-interface AppItem {
+const api = getSharedClient()
+
+interface AppCard {
   id: string
+  slug: string
   package_name: string
   title: string
   developer_name: string
-  developer_verified: boolean
   category: string
   category_name: string
   rating: number
-  rating_count: number
-  downloads: string
-  size_bytes: number
-  size_formatted: string
-  price_krw: number
+  install_count: number
+  icon_url: string
+  summary: string
+  monetization: string
   is_free: boolean
-  min_sdk: number
+}
+
+interface ModalApp {
+  id: string
+  slug: string
+  package_name: string
+  title: string
+  developer_name: string
+  category_name: string
+  rating: number
+  install_count: number
+  icon_url: string
+  description: string
+  whats_new: string
   version_name: string
   version_code: number
+  size_bytes: number
+  size_formatted: string
+  content_rating: string
+  license_spdx: string
+  monetization: string
+  is_free: boolean
+  price_label: string
+  cert_short: string
+  published_at: string
+  privacy_url: string
+  media: Array<{ url: string; width: number; height: number }>
+  release_id: string
   sha256: string
-  summary: string
-  description: string
-  permissions: string[]
-  signature_scheme: string
-  verified_at: string
-  is_sponsored?: boolean
-  iconSvg: string
 }
 
-// Crisp Vector SVG Icons
-const SVG_ICONS = {
-  omni: `<svg width="56" height="56" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="url(#omniG)"/><path d="M20 32L28 40L44 24" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="omniG" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop stop-color="#0084FF"/><stop offset="1" stop-color="#00C9FF"/></linearGradient></defs></svg>`,
-  finvault: `<svg width="56" height="56" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="url(#finG)"/><path d="M32 16L46 22V34C46 43 39 49 32 52C25 49 18 43 18 34V22L32 16Z" fill="white" fill-opacity="0.2" stroke="white" stroke-width="4" stroke-linejoin="round"/><circle cx="32" cy="34" r="5" fill="white"/><defs><linearGradient id="finG" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop stop-color="#00A870"/><stop offset="1" stop-color="#00E575"/></linearGradient></defs></svg>`,
-  messenger: `<svg width="56" height="56" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="url(#msgG)"/><path d="M20 22C20 18.7 22.7 16 26 16H38C41.3 16 44 18.7 44 22V36C44 39.3 41.3 42 38 42H28L20 48V22Z" fill="white"/><circle cx="28" cy="29" r="2.5" fill="#4F46E5"/><circle cx="36" cy="29" r="2.5" fill="#4F46E5"/><defs><linearGradient id="msgG" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop stop-color="#6366F1"/><stop offset="1" stop-color="#A855F7"/></linearGradient></defs></svg>`,
-  crypto: `<svg width="56" height="56" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="url(#cryG)"/><path d="M22 42L32 28L38 34L46 22" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="46" cy="22" r="3" fill="white"/><defs><linearGradient id="cryG" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop stop-color="#F59E0B"/><stop offset="1" stop-color="#D97706"/></linearGradient></defs></svg>`,
-  auth: `<svg width="56" height="56" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="url(#authG)"/><path d="M32 20C27.6 20 24 23.6 24 28C24 31.2 25.9 34 28.7 35.3L26 44H38L35.3 35.3C38.1 34 40 31.2 40 28C40 23.6 36.4 20 32 20Z" fill="white"/><defs><linearGradient id="authG" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop stop-color="#0284C7"/><stop offset="1" stop-color="#38BDF8"/></linearGradient></defs></svg>`,
-  editor: `<svg width="56" height="56" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="url(#devG)"/><path d="M24 24L16 32L24 40M40 24L48 32L40 40M34 20L30 44" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="devG" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop stop-color="#EF4444"/><stop offset="1" stop-color="#F97316"/></linearGradient></defs></svg>`,
-  runner: `<svg width="56" height="56" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="url(#gameG)"/><path d="M22 28V36M18 32H26M40 30A2 2 0 1 1 40 26A2 2 0 0 1 40 30ZM44 36A2 2 0 1 1 44 32A2 2 0 0 1 44 36Z" stroke="white" stroke-width="3" stroke-linecap="round"/><rect x="14" y="22" width="36" height="20" rx="6" stroke="white" stroke-width="3.5"/><defs><linearGradient id="gameG" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop stop-color="#8B5CF6"/><stop offset="1" stop-color="#EC4899"/></linearGradient></defs></svg>`
+function fmtCount(n: number): string {
+  if (n >= 100000000) return (n / 100000000).toFixed(1) + '억+'
+  if (n >= 10000) return Math.floor(n / 10000) + '만+'
+  if (n >= 1000) return (n / 1000).toFixed(1) + '천+'
+  return String(n)
 }
 
-// 7 Pre-seeded Apps matching Google Play Store Quality
-const allApps = ref<AppItem[]>([
-  {
-    id: 'app-omni-productivity-01',
-    package_name: 'com.omniwork.office',
-    title: 'Omni Productivity Suite',
-    developer_name: 'OmniWork Technologies',
-    developer_verified: true,
-    category: 'productivity',
-    category_name: '생산성 & 업무',
-    rating: 4.9,
-    rating_count: 42800,
-    downloads: '150만+',
-    size_bytes: 37539072,
-    size_formatted: '35.8 MB',
-    price_krw: 0,
-    is_free: true,
-    min_sdk: 26,
-    version_name: '3.4.2',
-    version_code: 30402,
-    sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
-    summary: '차세대 올인원 문서 편집, 프로젝트 관리 및 엔드투엔드 암호화 협업 스위트',
-    description: '문서 편집, 스프레드시트, 실시간 클라우드 동기화, 엔드투엔드 암호화 협업을 단 하나의 앱으로 완성하세요. 구글 플레이 독립 유통 공식 인증 패키지입니다.',
-    permissions: ['INTERNET', 'READ_EXTERNAL_STORAGE', 'POST_NOTIFICATIONS'],
-    signature_scheme: 'V3_CONTINUITY',
-    verified_at: '2026-10-30T12:00:00Z',
-    is_sponsored: true,
-    iconSvg: SVG_ICONS.omni
-  },
-  {
-    id: 'app-finvault-secure-02',
-    package_name: 'com.finvault.banking',
-    title: 'FinVault Secure Banking',
-    developer_name: 'FinVault Financial Labs',
-    developer_verified: true,
-    category: 'finance',
-    category_name: '금융 & 핀테크',
-    rating: 4.8,
-    rating_count: 28900,
-    downloads: '82만+',
-    size_bytes: 25690112,
-    size_formatted: '24.5 MB',
-    price_krw: 0,
-    is_free: true,
-    min_sdk: 28,
-    version_name: '2.1.0',
-    version_code: 20100,
-    sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-    summary: '생체인식 하드웨어 보안 키 및 지능형 가계부 자산 통합 자산 관리 솔루션',
-    description: '하드웨어 보안 모듈(HSM) 및 생체인증 FIDO2 기반 모바일 뱅킹 및 자산 관리 스위트.',
-    permissions: ['INTERNET', 'USE_BIOMETRIC', 'CAMERA'],
-    signature_scheme: 'V3_CONTINUITY',
-    verified_at: '2026-10-29T08:30:00Z',
-    is_sponsored: false,
-    iconSvg: SVG_ICONS.finvault
-  },
-  {
-    id: 'app-cloud-authenticator-05',
-    package_name: 'com.shieldguard.auth2fa',
-    title: 'Cloud Authenticator 2FA',
-    developer_name: 'ShieldGuard Security',
-    developer_verified: true,
-    category: 'tools',
-    category_name: '보안 & 인증',
-    rating: 4.9,
-    rating_count: 36700,
-    downloads: '67만+',
-    size_bytes: 13002342,
-    size_formatted: '12.4 MB',
-    price_krw: 0,
-    is_free: true,
-    min_sdk: 24,
-    version_name: '4.0.1',
-    version_code: 40001,
-    sha256: '4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a',
-    summary: 'RFC 6238 표준 TOTP 2차 인증기. 기기간 암호화 백업 및 긴급 복구 지원',
-    description: '표준 2단계 인증 코드 생성 및 종단간 암호화(E2EE) 클라우드 동기화 백업.',
-    permissions: ['CAMERA', 'USE_BIOMETRIC'],
-    signature_scheme: 'V3_CONTINUITY',
-    verified_at: '2026-10-26T17:40:00Z',
-    is_sponsored: false,
-    iconSvg: SVG_ICONS.auth
-  },
-  {
-    id: 'app-secure-messenger-03',
-    package_name: 'org.openprivacy.messenger',
-    title: 'Secure Messenger Pro',
-    developer_name: 'Open Privacy Labs',
-    developer_verified: true,
-    category: 'communication',
-    category_name: '커뮤니케이션',
-    rating: 4.8,
-    rating_count: 51200,
-    downloads: '210만+',
-    size_bytes: 29464985,
-    size_formatted: '28.1 MB',
-    price_krw: 0,
-    is_free: true,
-    min_sdk: 26,
-    version_name: '5.8.0',
-    version_code: 50800,
-    sha256: 'ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb',
-    summary: '영지식 암호화(ZKP) 기반 탈중앙화 메신저. 데이터 수집 제로 프라이버시',
-    description: '서버에 어떠한 메시지나 메타데이터도 저장하지 않는 순수 P2P 영지식 암호화 메신저.',
-    permissions: ['INTERNET', 'RECORD_AUDIO', 'CAMERA', 'VIBRATE'],
-    signature_scheme: 'V3_CONTINUITY',
-    verified_at: '2026-10-28T14:15:00Z',
-    is_sponsored: false,
-    iconSvg: SVG_ICONS.messenger
-  },
-  {
-    id: 'app-crypto-tracker-04',
-    package_name: 'com.blockmetric.crypto',
-    title: 'Pro Crypto Tracker',
-    developer_name: 'BlockMetric Systems',
-    developer_verified: true,
-    category: 'finance',
-    category_name: '금융 & 핀테크',
-    rating: 4.7,
-    rating_count: 14200,
-    downloads: '45만+',
-    size_bytes: 19084083,
-    size_formatted: '18.2 MB',
-    price_krw: 4900,
-    is_free: false,
-    min_sdk: 26,
-    version_name: '1.9.4',
-    version_code: 10904,
-    sha256: '4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce',
-    summary: '글로벌 50개 거래소 실시간 시세, 포트폴리오 세무 보고서 자동 생성기',
-    description: '실시간 WebSockets 시세 스트리밍 및 국세청 가상자산 소득세 신고용 원장 자동 생성.',
-    permissions: ['INTERNET', 'ACCESS_NETWORK_STATE'],
-    signature_scheme: 'V3_CONTINUITY',
-    verified_at: '2026-10-27T10:00:00Z',
-    is_sponsored: false,
-    iconSvg: SVG_ICONS.crypto
-  },
-  {
-    id: 'app-mobile-ide-06',
-    package_name: 'com.devtools.mobileide',
-    title: 'Code Editor Mobile IDE',
-    developer_name: 'Dev Tools Corp',
-    developer_verified: true,
-    category: 'productivity',
-    category_name: '도구 & 유틸리티',
-    rating: 4.6,
-    rating_count: 9800,
-    downloads: '31만+',
-    size_bytes: 44040192,
-    size_formatted: '42.0 MB',
-    price_krw: 9900,
-    is_free: false,
-    min_sdk: 28,
-    version_name: '2.5.0',
-    version_code: 20500,
-    sha256: 'ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d',
-    summary: '모바일 환경에서 구동되는 풀스택 터미널 및 Git 연동 고성능 코드 에디터',
-    description: '구문 강조, LSP 코드 자동완성, 통합 bash 터미널 및 Git 버전 관리 탑재.',
-    permissions: ['INTERNET', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE'],
-    signature_scheme: 'V3_CONTINUITY',
-    verified_at: '2026-10-25T11:20:00Z',
-    is_sponsored: false,
-    iconSvg: SVG_ICONS.editor
-  },
-  {
-    id: 'app-cyber-runner-07',
-    package_name: 'com.neonpixel.cyberrunner',
-    title: 'Cyber Runner 2026',
-    developer_name: 'Neon Pixel Studio',
-    developer_verified: true,
-    category: 'games',
-    category_name: '게임',
-    rating: 4.7,
-    rating_count: 63100,
-    downloads: '95만+',
-    size_bytes: 120586240,
-    size_formatted: '115.0 MB',
-    price_krw: 0,
-    is_free: true,
-    min_sdk: 26,
-    version_name: '1.2.0',
-    version_code: 10200,
-    sha256: 'e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683',
-    summary: '네온 사이버펑크 도시를 질주하는 하이퍼 액션 파쿠르 러닝 게임',
-    description: 'Vulkan 고성능 그래픽 엔진 탑재 및 120FPS 모바일 최적화 사이버펑크 러닝 게임.',
-    permissions: ['INTERNET', 'VIBRATE'],
-    signature_scheme: 'V3_CONTINUITY',
-    verified_at: '2026-10-24T09:10:00Z',
-    is_sponsored: false,
-    iconSvg: SVG_ICONS.runner
+function fmtBytes(n: number): string {
+  if (!n || n <= 0) return '—'
+  if (n >= 1048576) return (n / 1048576).toFixed(1) + ' MB'
+  if (n >= 1024) return (n / 1024).toFixed(1) + ' KB'
+  return n + ' B'
+}
+
+function iconFor(title: string, seed: string): string {
+  const ch = (title || '?').trim().slice(0, 1).toUpperCase() || '?'
+  let h = 0
+  for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  const hue = h % 360
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="hsl(${hue},55%,38%)"/><text x="32" y="42" font-size="28" font-weight="700" text-anchor="middle" fill="white" font-family="sans-serif">${ch}</text></svg>`
+  return 'data:image/svg+xml,' + encodeURIComponent(svg)
+}
+
+function deviceId(): string {
+  if (typeof window === 'undefined') return 'ssr-device'
+  let id = localStorage.getItem('bn_device_id')
+  if (!id) {
+    id = 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36)
+    localStorage.setItem('bn_device_id', id)
   }
-])
+  return id
+}
 
-const categories = [
-  { id: 'all', name: '전체', icon: '🌐' },
-  { id: 'productivity', name: '생산성 & 업무', icon: '💼' },
-  { id: 'finance', name: '금융 & 핀테크', icon: '💳' },
-  { id: 'communication', name: '커뮤니케이션', icon: '💬' },
-  { id: 'tools', name: '도구 & 보안', icon: '🛠️' },
-  { id: 'games', name: '게임', icon: '🎮' }
-]
+function sessionHash(): string {
+  if (typeof window === 'undefined') return 'ssr-session'
+  let h = sessionStorage.getItem('bn_session_hash')
+  if (!h) {
+    h = 'sess-' + Math.random().toString(36).slice(2)
+    sessionStorage.setItem('bn_session_hash', h)
+  }
+  return h
+}
+
+async function trackEvent(eventName: string, appId: string, extra?: Record<string, unknown>) {
+  try {
+    await api.ingestEvents([{
+      event_id: 'evt-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+      event_name: eventName,
+      occurred_at: new Date().toISOString(),
+      session_hash: sessionHash(),
+      platform: 'WEB_USER_DESKTOP',
+      country_code: 'KR',
+      locale: 'ko-KR',
+      device: { sdk_int: 0, abi: '', form_factor: 'DESKTOP' },
+      properties: { app_id: appId, ...(extra || {}) }
+    }])
+  } catch {
+    // Telemetry is best-effort; never break the storefront.
+  }
+}
+
+const categoryNames = ref<Record<string, string>>({})
+
+function toCard(item: CatalogAppItem, monetization = '', summary = ''): AppCard {
+  const free = monetization === 'FREE' || monetization === ''
+  return {
+    id: item.id,
+    slug: item.canonical_slug,
+    package_name: item.primary_package_name,
+    title: item.title,
+    developer_name: item.primary_package_name.split('.').slice(0, 2).join('.'),
+    category: item.primary_category_id,
+    category_name: categoryNames.value[item.primary_category_id] || item.primary_category_id,
+    rating: Math.round(item.average_rating * 10) / 10,
+    install_count: item.install_count,
+    icon_url: item.icon_url || iconFor(item.title, item.id),
+    summary,
+    monetization,
+    is_free: free
+  }
+}
+
+
+
+const allApps = ref<AppCard[]>([])
+const chartApps = ref<AppCard[]>([])
+const isLoading = ref(true)
+const loadError = ref('')
+const chartLoading = ref(false)
+
+async function enrichItems(items: CatalogAppItem[]): Promise<AppCard[]> {
+  return await Promise.all(items.map(async (item) => {
+    try {
+      const detail = await api.getAppBySlug(item.canonical_slug)
+      return toCard(item, detail.app.monetization_type, detail.localization?.short_description || '')
+    } catch {
+      return toCard(item)
+    }
+  }))
+}
+
+async function loadHome() {
+  isLoading.value = true
+  loadError.value = ''
+  try {
+    const cats = await api.getCategories()
+    const names: Record<string, string> = {}
+    for (const c of cats) {
+      names[c.id] = c.name_i18n['ko-KR'] || c.name_i18n['en-US'] || c.id
+    }
+    categoryNames.value = names
+    categoryList.value = [
+      { id: 'all', name: '전체', icon: '🌐' },
+      ...cats.map(c => ({ id: c.id, name: names[c.id], icon: '📦' }))
+    ]
+    const res = await api.getCatalogApps({ limit: '24' })
+    allApps.value = await enrichItems(res.items || [])
+  } catch (err) {
+    loadError.value = err instanceof Error ? err.message : 'Failed to load catalog'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const CHART_MAP: Record<string, string> = { free: 'top_free', grossing: 'top_grossing', trending: 'trending' }
+
+async function loadChart() {
+  chartLoading.value = true
+  try {
+    const items = await api.getChart(CHART_MAP[chartTab.value] || 'top_free', 9)
+    chartApps.value = await enrichItems(items)
+  } catch {
+    chartApps.value = []
+  } finally {
+    chartLoading.value = false
+  }
+}
+
+const categoryList = ref<Array<{ id: string; name: string; icon: string }>>([
+  { id: 'all', name: '전체', icon: '🌐' }
+])
 
 const selectedCategory = ref('all')
 const chartTab = ref<'free' | 'grossing' | 'trending'>('free')
 const currentBannerIdx = ref(0)
-const selectedApp = ref<AppItem | null>(null)
+const selectedApp = ref<ModalApp | null>(null)
+const modalReviews = ref<Array<{ id: string; rating: number; title: string; comment: string; created_at: string; is_verified_install: boolean }>>([])
+const modalLoading = ref(false)
 const toastMessage = ref('')
 const isDownloading = ref(false)
 const downloadProgress = ref(0)
-const isInstalled = ref(false)
+const hasDownloaded = ref(false)
 const isWishlisted = ref(false)
+const wishlist = ref<string[]>([])
 
-// 3 Cinematic Hero Billboards
-const billboardBanners = [
-  {
-    id: 'banner-omni',
-    tag: '✨ 에디터 추천 필수 앱',
-    title: 'Omni Productivity Suite',
-    subtitle: '차세대 클라우드 협업, 문서 편집, 엔드투엔드 암호화가 집약된 올인원 비즈니스 오피스.',
-    gradient: 'linear-gradient(135deg, #0b1a3a 0%, #0d2b59 50%, #0a4b78 100%)',
-    app: allApps.value[0],
-    graphicSvg: `<svg viewBox="0 0 200 320" width="100%" height="100%"><rect width="200" height="320" rx="16" fill="#0A192F"/><rect x="15" y="30" width="170" height="40" rx="8" fill="#1E3A8A"/><rect x="15" y="80" width="170" height="70" rx="8" fill="#172554"/><path d="M30 115L60 95L100 125L170 85" stroke="#38BDF8" stroke-width="4" stroke-linecap="round"/><rect x="15" y="160" width="80" height="90" rx="8" fill="#1E293B"/><rect x="105" y="160" width="80" height="90" rx="8" fill="#1E293B"/><circle cx="100" cy="285" r="14" fill="#2563EB"/></svg>`
-  },
-  {
-    id: 'banner-finvault',
-    tag: '🛡️ 최고 등급 금융 보안',
-    title: 'FinVault Secure Banking',
-    subtitle: '생체인식 하드웨어 보안 모듈(HSM) 탑재. 개인 자산 및 법인 금융 완벽 보호.',
-    gradient: 'linear-gradient(135deg, #062b1e 0%, #0c4a34 50%, #0a5c40 100%)',
-    app: allApps.value[1],
-    graphicSvg: `<svg viewBox="0 0 200 320" width="100%" height="100%"><rect width="200" height="320" rx="16" fill="#061F17"/><circle cx="100" cy="90" r="45" fill="#059669" fill-opacity="0.3"/><circle cx="100" cy="90" r="28" fill="#10B981"/><path d="M90 90L98 98L112 82" stroke="white" stroke-width="4" stroke-linecap="round"/><rect x="20" y="160" width="160" height="50" rx="10" fill="#064E3B"/><rect x="20" y="220" width="160" height="70" rx="10" fill="#064E3B"/></svg>`
-  },
-  {
-    id: 'banner-cyberrunner',
-    tag: '🎮 120FPS 모바일 액션',
-    title: 'Cyber Runner 2026',
-    subtitle: '네온 사이버펑크 도시를 질주하는 하이퍼 파쿠르 러닝. Vulkan 모바일 그래픽 엔진 적용.',
-    gradient: 'linear-gradient(135deg, #240a3e 0%, #43126b 50%, #68178d 100%)',
-    app: allApps.value[6],
-    graphicSvg: `<svg viewBox="0 0 200 320" width="100%" height="100%"><rect width="200" height="320" rx="16" fill="#1E0B36"/><path d="M10 200L100 80L190 200Z" fill="url(#neonG)" fill-opacity="0.5"/><circle cx="100" cy="140" r="24" fill="#F43F5E"/><path d="M0 260L200 240L100 320Z" fill="#7C3AED"/><defs><linearGradient id="neonG"><stop stop-color="#EC4899"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient></defs></svg>`
+function loadWishlist() {
+  if (typeof window === 'undefined') return
+  try {
+    wishlist.value = JSON.parse(localStorage.getItem('bn_wishlist') || '[]')
+  } catch {
+    wishlist.value = []
   }
+}
+
+const BANNER_GRADIENTS = [
+  'linear-gradient(135deg, #0b1a3a 0%, #0d2b59 50%, #0a4b78 100%)',
+  'linear-gradient(135deg, #062b1e 0%, #0c4a34 50%, #0a5c40 100%)',
+  'linear-gradient(135deg, #240a3e 0%, #43126b 50%, #68178d 100%)'
 ]
+
+const billboardBanners = computed(() =>
+  allApps.value.slice(0, 3).map((app, idx) => ({
+    id: 'banner-' + app.id,
+    tag: '★ 평점 ' + app.rating.toFixed(1) + ' · ' + app.category_name,
+    title: app.title,
+    subtitle: app.summary || app.package_name,
+    gradient: BANNER_GRADIENTS[idx % BANNER_GRADIENTS.length],
+    app
+  }))
+)
 
 // Filtered apps based on selected category pill
 const filteredRecommendedApps = computed(() => {
@@ -738,100 +659,153 @@ const filteredRecommendedApps = computed(() => {
   return allApps.value.filter(a => a.category === selectedCategory.value)
 })
 
-// Filtered apps for Top Charts
-const chartFilteredApps = computed(() => {
-  if (chartTab.value === 'free') {
-    return allApps.value.filter(a => a.is_free)
-  } else if (chartTab.value === 'grossing') {
-    return [...allApps.value].sort((a, b) => b.price_krw - a.price_krw)
-  } else {
-    return [...allApps.value].sort((a, b) => b.rating - a.rating)
+const chartFilteredApps = computed(() => chartApps.value)
+
+const reviewHistogram = computed(() => {
+  const buckets = [0, 0, 0, 0, 0]
+  for (const r of modalReviews.value) {
+    if (r.rating >= 1 && r.rating <= 5) buckets[5 - r.rating] += 1
   }
+  const total = modalReviews.value.length
+  return buckets.map((count, i) => ({
+    stars: 5 - i,
+    count,
+    pct: total > 0 ? Math.round((count / total) * 100) : 0
+  }))
 })
 
 function selectCategory(catId: string) {
   selectedCategory.value = catId
 }
 
-function openAppDetail(app: AppItem) {
-  selectedApp.value = app
+function switchChart(tab: 'free' | 'grossing' | 'trending') {
+  chartTab.value = tab
+  void loadChart()
+}
+
+function priceLabelFor(isFree: boolean, prices: Array<{ currency: string; list_price_minor: number }>): string {
+  if (isFree || prices.length === 0) return isFree ? '무료' : '유료'
+  const krw = prices.find(p => p.currency === 'KRW') || prices[0]
+  if (krw.currency === 'KRW') return '₩' + krw.list_price_minor.toLocaleString()
+  return (krw.list_price_minor / 100).toFixed(2) + ' ' + krw.currency
+}
+
+async function openAppDetail(app: AppCard) {
+  modalLoading.value = true
+  modalReviews.value = []
   isDownloading.value = false
   downloadProgress.value = 0
-  isInstalled.value = false
+  hasDownloaded.value = false
+  try {
+    const [detail, prices, reviews] = await Promise.all([
+      api.getAppBySlug(app.slug),
+      api.getAppPrices(app.id).catch(() => []),
+      api.listReviews(app.id).catch(() => [])
+    ])
+    const dist = detail.distributions[0]
+    const rel = dist?.latest_release
+    const free = detail.app.monetization_type === 'FREE'
+    selectedApp.value = {
+      id: detail.app.id,
+      slug: detail.app.canonical_slug,
+      package_name: detail.app.primary_package_name,
+      title: detail.localization?.title || app.title,
+      developer_name: app.developer_name,
+      category_name: categoryNames.value[detail.app.primary_category_id] || detail.app.primary_category_id,
+      rating: Math.round(detail.app.average_rating * 10) / 10,
+      install_count: detail.app.install_count,
+      icon_url: app.icon_url,
+      description: detail.localization?.full_description || detail.localization?.short_description || '',
+      whats_new: detail.localization?.whats_new || rel?.release_notes || '',
+      version_name: rel?.version_name || '',
+      version_code: rel?.version_code || 0,
+      size_bytes: rel?.file_size_bytes || 0,
+      size_formatted: fmtBytes(rel?.file_size_bytes || 0),
+      content_rating: detail.app.content_rating || 'ALL',
+      license_spdx: detail.app.license_spdx || '',
+      monetization: detail.app.monetization_type,
+      is_free: free,
+      price_label: priceLabelFor(free, prices),
+      cert_short: (dist?.signing_cert_sha256 || '').slice(0, 16),
+      published_at: rel?.published_at || '',
+      privacy_url: detail.localization?.privacy_policy_url || '',
+      media: (detail.media_assets || []).map(m => ({ url: m.url, width: m.width, height: m.height })),
+      release_id: rel?.id || '',
+      sha256: dist?.signing_cert_sha256 || ''
+    }
+    modalReviews.value = reviews
+    isWishlisted.value = wishlist.value.includes(detail.app.id)
+    void trackEvent('app.detail.view', detail.app.id)
+  } catch (err) {
+    showToast('앱 정보를 불러오지 못했습니다.')
+  } finally {
+    modalLoading.value = false
+  }
 }
 
 function closeAppDetail() {
   selectedApp.value = null
 }
 
-function triggerQuickInstall(app: AppItem) {
-  openAppDetail(app)
-  handleInstallClick(app)
+function triggerQuickInstall(app: AppCard) {
+  void openAppDetail(app)
+  showToast('상세 화면에서 다운로드를 진행하십시오.')
 }
 
-async function handleInstallClick(app: AppItem) {
-  if (isInstalled.value) {
-    showToast(`${app.title} 이미 설치된 패키지입니다.`)
+async function handleInstallClick() {
+  const app = selectedApp.value
+  if (!app || !app.release_id) {
+    showToast('배포된 릴리스가 없습니다.')
     return
   }
-
   isDownloading.value = true
   downloadProgress.value = 25
-
   try {
-    const res = await fetch('/api/v1/distribution/tokens', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        app_id: app.id,
-        package_name: app.package_name
-      })
-    })
-
+    const signed = await api.createDownloadToken(app.id, app.release_id, deviceId(), app.sha256)
     downloadProgress.value = 75
-
-    if (res.ok) {
-      const data = await res.json()
-      downloadProgress.value = 100
-      isDownloading.value = false
-      isInstalled.value = true
-
-      // Trigger actual APK file download in browser
-      if (typeof window !== 'undefined') {
-        const dummyApkContent = `PK\x03\x04# BookingNetwork Verified Package\nPackage: ${app.package_name}\nVersion: ${app.version_name}\nSHA-256: ${app.sha256}\nToken: ${data.token}\n`
-        const blob = new Blob([dummyApkContent], { type: 'application/vnd.android.package-archive' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${app.package_name}-v${app.version_name}.apk`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-      }
-
-      showToast(`${app.title} APK 패키지 다운로드가 완료되었습니다.`)
-    } else {
-      isDownloading.value = false
-      showToast('다운로드 토큰 발급에 실패했습니다.')
+    if (typeof window !== 'undefined') {
+      const a = document.createElement('a')
+      a.href = signed.url
+      a.download = `${app.package_name}-v${app.version_name}.apk`
+      a.rel = 'noopener'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
     }
+    downloadProgress.value = 100
+    hasDownloaded.value = true
+    void trackEvent('app.download.started', app.id, { release_id: app.release_id })
+    showToast(`${app.title} 서명된 다운로드가 시작되었습니다. (SHA-256: ${signed.sha256_checksum.slice(0, 12)}…)`)
   } catch (err) {
+    showToast('다운로드 토큰 발급에 실패했습니다.')
+  } finally {
     isDownloading.value = false
-    showToast('다운로드 중 네트워크 오류가 발생했습니다.')
   }
 }
 
 function copyShareLink() {
   if (typeof window !== 'undefined' && selectedApp.value) {
-    const url = `${window.location.origin}/apps/${selectedApp.value.id}`
+    const url = `${window.location.origin}/apps/${selectedApp.value.slug}`
     navigator.clipboard?.writeText(url)
     showToast('앱 공유 링크가 클립보드에 복사되었습니다.')
   }
 }
 
 function toggleWishlist() {
-  isWishlisted.value = !isWishlisted.value
-  showToast(isWishlisted.value ? '위시리스트에 추가되었습니다.' : '위시리스트에서 삭제되었습니다.')
+  const app = selectedApp.value
+  if (!app) return
+  if (wishlist.value.includes(app.id)) {
+    wishlist.value = wishlist.value.filter(id => id !== app.id)
+    isWishlisted.value = false
+    showToast('위시리스트에서 삭제되었습니다.')
+  } else {
+    wishlist.value = [...wishlist.value, app.id]
+    isWishlisted.value = true
+    showToast('위시리스트에 추가되었습니다.')
+  }
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('bn_wishlist', JSON.stringify(wishlist.value))
+  }
 }
 
 function showToast(msg: string) {
@@ -841,15 +815,10 @@ function showToast(msg: string) {
   }, 3500)
 }
 
-// Generate Realistic Phone Mockup Screenshots
-function getAppScreenshots(app: AppItem): string[] {
-  return [
-    `<svg viewBox="0 0 180 320" width="100%" height="100%"><rect width="180" height="320" rx="16" fill="#131B2E"/><rect x="14" y="24" width="152" height="40" rx="8" fill="#1E293B"/><rect x="14" y="74" width="152" height="120" rx="8" fill="#0F172A"/><circle cx="50" cy="134" r="24" fill="#0084FF" fill-opacity="0.3"/><path d="M40 134L48 142L62 126" stroke="#0084FF" stroke-width="3" stroke-linecap="round"/><rect x="85" y="120" width="65" height="10" rx="4" fill="#38BDF8"/><rect x="85" y="138" width="45" height="8" rx="4" fill="#64748B"/><rect x="14" y="204" width="152" height="38" rx="8" fill="#1E293B"/><rect x="14" y="250" width="152" height="50" rx="8" fill="#1E293B"/></svg>`,
-    `<svg viewBox="0 0 180 320" width="100%" height="100%"><rect width="180" height="320" rx="16" fill="#0A101D"/><rect x="14" y="24" width="152" height="28" rx="6" fill="#1E293B"/><path d="M20 160C40 120 70 200 100 130C130 80 150 140 165 110" stroke="#00E575" stroke-width="4" stroke-linecap="round"/><rect x="14" y="190" width="70" height="100" rx="8" fill="#1E293B"/><rect x="96" y="190" width="70" height="100" rx="8" fill="#1E293B"/></svg>`,
-    `<svg viewBox="0 0 180 320" width="100%" height="100%"><rect width="180" height="320" rx="16" fill="#151226"/><rect x="14" y="24" width="152" height="60" rx="10" fill="#2D1B4E"/><rect x="14" y="94" width="152" height="60" rx="10" fill="#2D1B4E"/><rect x="14" y="164" width="152" height="60" rx="10" fill="#2D1B4E"/><rect x="14" y="234" width="152" height="60" rx="10" fill="#2D1B4E"/></svg>`,
-    `<svg viewBox="0 0 180 320" width="100%" height="100%"><rect width="180" height="320" rx="16" fill="#1A1F2C"/><circle cx="90" cy="110" r="40" fill="#059669" fill-opacity="0.2"/><path d="M90 85L108 95V115C108 128 100 138 90 142C80 138 72 128 72 115V95L90 85Z" fill="#10B981"/><rect x="20" y="180" width="140" height="40" rx="8" fill="#2A324B"/><rect x="20" y="230" width="140" height="40" rx="8" fill="#2A324B"/></svg>`
-  ]
-}
+onMounted(() => {
+  loadWishlist()
+  void loadHome().then(() => { void loadChart() })
+})
 </script>
 
 <style scoped>
@@ -861,6 +830,15 @@ function getAppScreenshots(app: AppItem): string[] {
   max-width: 1360px;
   margin: 0 auto;
   padding: 0 24px 60px;
+}
+.home-status {
+  padding: 24px;
+  text-align: center;
+  color: var(--play-text-secondary, #9AA0A6);
+  font-size: 14px;
+}
+.home-error {
+  color: #fca5a5;
 }
 
 /* 1. Category Pills Bar */

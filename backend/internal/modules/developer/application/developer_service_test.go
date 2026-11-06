@@ -18,6 +18,7 @@ type mockDevRepo struct {
 	keys       map[string]*domain.APIKey
 	keysByHash map[string]string
 	keysByOrg  map[string][]string
+	payouts    map[string]*domain.PayoutRecord
 }
 
 func newMockDevRepo() *mockDevRepo {
@@ -29,6 +30,7 @@ func newMockDevRepo() *mockDevRepo {
 		keys:       make(map[string]*domain.APIKey),
 		keysByHash: make(map[string]string),
 		keysByOrg:  make(map[string][]string),
+		payouts:    make(map[string]*domain.PayoutRecord),
 	}
 }
 
@@ -60,6 +62,19 @@ func (r *mockDevRepo) GetOrgBySlug(ctx context.Context, slug string) (*domain.De
 	cp := *o
 	return &cp, nil
 }
+func (r *mockDevRepo) ListOrgsForUser(ctx context.Context, userID string) ([]domain.DeveloperOrg, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var out []domain.DeveloperOrg
+	for orgID, users := range r.members {
+		if _, ok := users[userID]; ok {
+			if o, exists := r.orgs[orgID]; exists {
+				out = append(out, *o)
+			}
+		}
+	}
+	return out, nil
+}
 func (r *mockDevRepo) UpdateOrgStatus(ctx context.Context, orgID string, status domain.OrgVerificationStatus) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -85,6 +100,34 @@ func (r *mockDevRepo) GetLatestVerification(ctx context.Context, orgID string) (
 	}
 	cp := vs[len(vs)-1]
 	return &cp, nil
+}
+func (r *mockDevRepo) DecideVerificationRecord(ctx context.Context, verificationID, status, reviewerID, notes string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for orgID := range r.verifs {
+		for i := range r.verifs[orgID] {
+			if r.verifs[orgID][i].ID == verificationID {
+				r.verifs[orgID][i].Status = status
+				r.verifs[orgID][i].ReviewerID = reviewerID
+				r.verifs[orgID][i].ReviewNotes = notes
+				return nil
+			}
+		}
+	}
+	return domain.ErrVerificationNotFound
+}
+func (r *mockDevRepo) ListVerificationsByStatus(ctx context.Context, status string) ([]domain.DeveloperVerification, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var out []domain.DeveloperVerification
+	for _, list := range r.verifs {
+		for _, v := range list {
+			if v.Status == status {
+				out = append(out, v)
+			}
+		}
+	}
+	return out, nil
 }
 func (r *mockDevRepo) AddMember(ctx context.Context, m *domain.OrgMember) error {
 	r.mu.Lock()
@@ -117,6 +160,18 @@ func (r *mockDevRepo) ListMembers(ctx context.Context, orgID string) ([]domain.O
 		out = append(out, *m)
 	}
 	return out, nil
+}
+func (r *mockDevRepo) RemoveMember(ctx context.Context, orgID, userID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.members[orgID] == nil {
+		return domain.ErrMemberNotFound
+	}
+	if _, ok := r.members[orgID][userID]; !ok {
+		return domain.ErrMemberNotFound
+	}
+	delete(r.members[orgID], userID)
+	return nil
 }
 func (r *mockDevRepo) CreateAPIKey(ctx context.Context, k *domain.APIKey) error {
 	r.mu.Lock()
@@ -160,6 +215,32 @@ func (r *mockDevRepo) ListAPIKeys(ctx context.Context, orgID string) ([]domain.A
 	return out, nil
 }
 
+func (r *mockDevRepo) SavePayoutRecord(ctx context.Context, rec *domain.PayoutRecord) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cp := *rec
+	r.payouts[rec.OrgID] = &cp
+	return nil
+}
+func (r *mockDevRepo) GetPayoutRecord(ctx context.Context, orgID string) (*domain.PayoutRecord, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	rec, ok := r.payouts[orgID]
+	if !ok {
+		return nil, nil
+	}
+	cp := *rec
+	return &cp, nil
+}
+func (r *mockDevRepo) GetPayoutCiphertext(ctx context.Context, orgID string) ([]byte, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	rec, ok := r.payouts[orgID]
+	if !ok {
+		return nil, domain.ErrPayoutAccountNotFound
+	}
+	return rec.Ciphertext, nil
+}
 func setupDev(t *testing.T) (*application.OrgService, *application.MemberService, *application.APIKeyService, *mockDevRepo) {
 	t.Helper()
 	repo := newMockDevRepo()

@@ -7,11 +7,10 @@
 
     <!-- Active Kill Switch Warning Banner -->
     <div class="alert alert-danger-banner">
-      <div class="banner-icon">🚨</div>
       <div class="banner-text">
         <strong>HIGH-IMPACT ADMINISTRATIVE ACTION</strong>
         <span>
-          Activating the Kill Switch immediately revokes distribution, invalidates all active download tokens within 100ms, purges CDN Edge caches globally, and triggers client-side uninstallation advisories.
+          Activating the Kill Switch immediately blocks new download tokens and marks every update response for this package as DISTRIBUTION_SUSPENDED with an uninstall advisory.
         </span>
       </div>
     </div>
@@ -62,14 +61,16 @@
         </div>
       </div>
 
+      <div v-if="actionError" class="load-error">{{ actionError }}</div>
+      <div v-if="actionDone" class="action-done">{{ actionDone }}</div>
       <div class="form-actions">
-        <button 
-          @click="executeKillSwitch" 
+        <button
+          @click="executeKillSwitch"
           class="btn btn-danger-action"
           :disabled="!isValidForm || isExecuting"
           id="btnTriggerKillSwitch"
         >
-          {{ isExecuting ? 'Executing Kill Switch...' : '🚨 EXECUTE IMMEDIATE KILL SWITCH' }}
+          {{ isExecuting ? 'Executing Kill Switch...' : 'EXECUTE IMMEDIATE KILL SWITCH' }}
         </button>
       </div>
     </div>
@@ -77,28 +78,29 @@
     <!-- Active Revocation Ledger -->
     <div class="ledger-card">
       <h3>Active Revoked Applications & Releases</h3>
-      <table class="takedown-table">
+      <div v-if="isLoading" class="loading-row">Loading kill-switch ledger…</div>
+      <div v-if="loadError" class="load-error">{{ loadError }}</div>
+      <div v-if="!isLoading && !loadError && activeRevocations.length === 0" class="empty-row">No active kill-switches. All packages are servable.</div>
+      <table v-if="activeRevocations.length > 0" class="takedown-table">
         <thead>
           <tr>
-            <th>Application</th>
-            <th>Package</th>
-            <th>Reason Code</th>
+            <th>Package / App</th>
+            <th>Reason</th>
             <th>Revoked By</th>
             <th>Timestamp</th>
-            <th>Edge Purge</th>
+            <th>Distribution</th>
             <th>Action</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="item in activeRevocations" :key="item.id">
-            <td class="font-bold">{{ item.appName }}</td>
-            <td class="font-mono text-sm">{{ item.packageName }}</td>
-            <td><span class="badge badge-danger">{{ item.reasonCode }}</span></td>
-            <td>{{ item.revokedBy }}</td>
-            <td class="font-mono text-xs">{{ item.timestamp }}</td>
-            <td><span class="badge badge-success">✓ Purged</span></td>
+          <tr v-for="item in activeRevocations" :key="item.app_id">
+            <td class="font-mono text-sm">{{ item.app_id }}</td>
+            <td>{{ item.reason }}</td>
+            <td>{{ item.triggered_by }}</td>
+            <td class="font-mono text-xs">{{ item.triggered_at }}</td>
+            <td><span class="badge badge-danger">SUSPENDED</span></td>
             <td>
-              <button @click="restoreApp(item.id)" class="btn btn-outline btn-xs">Restore</button>
+              <button @click="restoreApp(item.app_id)" class="btn btn-outline btn-xs" :disabled="isExecuting">Restore</button>
             </td>
           </tr>
         </tbody>
@@ -108,24 +110,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { getSharedClient, ApiClientError } from '@bookingnetwork/api-client';
+
+const api = getSharedClient();
+
+interface KillSwitchState {
+  app_id: string;
+  is_triggered: boolean;
+  reason: string;
+  triggered_by: string;
+  triggered_at: string;
+}
 
 const targetPackageName = ref('');
 const revocationScope = ref('ALL_RELEASES');
 const reasonCode = ref('');
 const evidenceNotes = ref('');
 const isExecuting = ref(false);
+const isLoading = ref(true);
+const loadError = ref('');
+const actionError = ref('');
+const actionDone = ref('');
 
-const activeRevocations = ref([
-  {
-    id: 'takedown-001',
-    appName: 'Trojan Fake Updater',
-    packageName: 'com.fraud.fakestore.update',
-    reasonCode: 'MALWARE_CONFIRMED',
-    revokedBy: 'admin_sec_ops@bookingnetwork.com',
-    timestamp: '2026-10-30 18:22:10 UTC'
-  }
-]);
+const activeRevocations = ref<KillSwitchState[]>([]);
 
 const isValidForm = computed(() => {
   return targetPackageName.value.trim().length > 3 &&
@@ -133,47 +141,62 @@ const isValidForm = computed(() => {
          evidenceNotes.value.trim().length >= 10;
 });
 
+onMounted(async () => {
+  await loadLedger();
+  isLoading.value = false;
+});
+
+async function loadLedger() {
+  loadError.value = '';
+  try {
+    const list = await api.listKillSwitches() as KillSwitchState[];
+    activeRevocations.value = list.filter(s => s.is_triggered);
+  } catch (err) {
+    loadError.value = err instanceof ApiClientError ? err.message : 'Failed to load kill-switch ledger';
+  }
+}
+
 async function executeKillSwitch() {
   if (!confirm(`CRITICAL WARNING: Are you completely certain you want to activate the Kill Switch on ${targetPackageName.value}?`)) {
     return;
   }
 
   isExecuting.value = true;
+  actionError.value = '';
+  actionDone.value = '';
   try {
-    const res = await fetch(`/api/v1/admin/security/kill-switch/${targetPackageName.value}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        scope: revocationScope.value,
-        reasonCode: reasonCode.value,
-        evidence: evidenceNotes.value
-      })
+    await api.triggerKillSwitch(targetPackageName.value.trim(), {
+      scope: revocationScope.value,
+      reasonCode: reasonCode.value,
+      evidence: evidenceNotes.value.trim()
     });
-
-    if (res.ok) {
-      activeRevocations.value.unshift({
-        id: `takedown-${Date.now()}`,
-        appName: targetPackageName.value,
-        packageName: targetPackageName.value,
-        reasonCode: reasonCode.value,
-        revokedBy: 'admin_sec_ops@bookingnetwork.com',
-        timestamp: new Date().toISOString()
-      });
-      targetPackageName.value = '';
-      reasonCode.value = '';
-      evidenceNotes.value = '';
-      alert('Kill Switch executed successfully. Downloads blocked and CDN purged.');
-    }
+    targetPackageName.value = '';
+    reasonCode.value = '';
+    evidenceNotes.value = '';
+    actionDone.value = 'Kill Switch executed. Download tokens and updates for this package are now blocked.';
+    await loadLedger();
   } catch (err) {
-    console.error(err);
+    actionError.value = err instanceof ApiClientError ? err.message : 'Failed to execute kill switch';
   } finally {
     isExecuting.value = false;
   }
 }
 
-async function restoreApp(id: string) {
-  if (confirm('Reactivate this application?')) {
-    activeRevocations.value = activeRevocations.value.filter(item => item.id !== id);
+async function restoreApp(packageName: string) {
+  if (!confirm(`Reactivate ${packageName}? Downloads and updates will resume.`)) {
+    return;
+  }
+  isExecuting.value = true;
+  actionError.value = '';
+  actionDone.value = '';
+  try {
+    await api.clearKillSwitch(packageName);
+    actionDone.value = `${packageName} reactivated.`;
+    await loadLedger();
+  } catch (err) {
+    actionError.value = err instanceof ApiClientError ? err.message : 'Failed to lift kill switch';
+  } finally {
+    isExecuting.value = false;
   }
 }
 </script>
@@ -281,7 +304,37 @@ async function restoreApp(id: string) {
 .badge-danger { background: #fee2e2; color: #991b1b; }
 .badge-success { background: #dcfce7; color: #166534; }
 .btn-outline { border: 1px solid #cbd5e1; background: transparent; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+.btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-xs { font-size: 11px; }
 .font-mono { font-family: monospace; }
+.loading-row {
+  padding: 16px;
+  color: #64748b;
+  font-size: 14px;
+}
+.load-error {
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.action-done {
+  padding: 12px 16px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.empty-row {
+  padding: 24px;
+  color: #64748b;
+  font-size: 14px;
+  text-align: center;
+}
 </style>
 

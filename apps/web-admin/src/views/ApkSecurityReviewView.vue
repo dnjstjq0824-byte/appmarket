@@ -5,150 +5,152 @@
       <p class="subtitle">Multi-engine malware analysis, permission risk delta, and certificate integrity verification</p>
     </div>
 
-    <!-- Security Summary Card -->
-    <div class="security-card" :class="overallVerdictClass">
-      <div class="card-icon">{{ verdictIcon }}</div>
-      <div class="card-info">
-        <h3>Security Verdict: {{ scanReport.verdict }}</h3>
-        <p>{{ verdictDescription }}</p>
-      </div>
-      <div class="risk-score-gauge">
-        <span class="score-label">Permission Risk Score</span>
-        <span class="score-number font-mono" :class="riskScoreClass">{{ scanReport.permissionRiskScore }}/100</span>
-      </div>
+    <div class="queue-bar">
+      <label for="scanSelect">Stored scan reports ({{ scans.length }})</label>
+      <select id="scanSelect" v-model="activeArtifactId" @change="loadReport">
+        <option v-for="s in scans" :key="s.id" :value="s.artifact_id">
+          {{ s.artifact_id }} — {{ s.scan_verdict }} ({{ s.scanned_at }})
+        </option>
+      </select>
     </div>
+    <div v-if="isLoading" class="loading-row">Loading scan reports…</div>
+    <div v-if="loadError" class="load-error">{{ loadError }}</div>
 
-    <!-- Scan Results Grid -->
-    <div class="results-grid">
-      <!-- Antivirus & YARA -->
-      <div class="result-box">
-        <h4>1. Static Malware & YARA Signatures</h4>
-        <div v-if="scanReport.malwareDetections.length === 0" class="status-clean">
-          ✓ No malware or trojan signatures detected (ClamAV & YARA clean)
-        </div>
-        <div v-else class="status-threat">
-          <div v-for="threat in scanReport.malwareDetections" :key="threat.ruleName" class="threat-item">
-            <strong>⚠️ {{ threat.ruleName }}</strong>
-            <span>Severity: {{ threat.severity }} | Category: {{ threat.category }}</span>
+    <template v-if="!isLoading && !loadError">
+      <div v-if="scans.length === 0" class="empty-row">No scan reports stored yet. Reports appear after binaries complete the upload pipeline.</div>
+
+      <template v-else-if="report">
+        <div class="security-card" :class="overallVerdictClass">
+          <div class="card-info">
+            <h3>Security Verdict: {{ report.scan_verdict }}</h3>
+            <p>{{ verdictDescription }} Engine {{ report.scanner_engine_version }} · Scanned {{ report.scanned_at }}</p>
+          </div>
+          <div class="risk-score-gauge">
+            <span class="score-label">Permission Risk Score</span>
+            <span class="score-number font-mono" :class="riskScoreClass">{{ report.risk_score }}/100</span>
           </div>
         </div>
-      </div>
 
-      <!-- Certificate Blacklist -->
-      <div class="result-box">
-        <h4>2. Certificate Reputation & Lineage</h4>
-        <div class="cert-item">
-          <label>Signing Scheme</label>
-          <div class="val font-mono">v2 + v3 Verified (No v1 fallback vulnerability)</div>
-        </div>
-        <div class="cert-item">
-          <label>Debug Certificate</label>
-          <div class="val text-success">✓ False (Production signed)</div>
-        </div>
-        <div class="cert-item">
-          <label>Known Blacklist Check</label>
-          <div class="val" :class="scanReport.isCertBlacklisted ? 'text-danger' : 'text-success'">
-            {{ scanReport.isCertBlacklisted ? '🚨 Blacklisted Malicious Certificate' : '✓ Clean (Not in blacklists)' }}
+        <div class="results-grid">
+          <div class="result-box">
+            <h4>1. Static Malware & YARA Signatures</h4>
+            <div class="cert-item">
+              <label>ClamAV Status</label>
+              <div class="val" :class="report.clamav_status === 'CLEAN' ? 'text-success' : 'text-danger'">{{ report.clamav_status }}</div>
+            </div>
+            <div v-if="(report.yara_matched_rules || []).length === 0" class="status-clean">
+              No YARA rules matched.
+            </div>
+            <div v-else class="status-threat">
+              <div v-for="rule in (report.yara_matched_rules || [])" :key="rule" class="threat-item">
+                <strong>{{ rule }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="result-box">
+            <h4>2. Brand Impersonation & Permissions</h4>
+            <div class="cert-item">
+              <label>Impersonation Similarity Score</label>
+              <div class="val font-mono">{{ report.impersonation_similarity_score }}</div>
+            </div>
+            <div class="cert-item">
+              <label>Dangerous Permissions ({{ (report.dangerous_permissions || []).length }})</label>
+              <div v-if="(report.dangerous_permissions || []).length === 0" class="val text-success">None declared</div>
+              <ul v-else class="perm-list">
+                <li v-for="perm in (report.dangerous_permissions || [])" :key="perm" class="font-mono">{{ perm }}</li>
+              </ul>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Dangerous Permission Diff -->
-    <div class="perm-diff-box">
-      <h4>3. Dangerous Permission Delta (vs Previous Release)</h4>
-      <p class="perm-desc">Highlights permissions newly requested in this build that access sensitive user data.</p>
-      
-      <table class="perm-table">
-        <thead>
-          <tr>
-            <th>Permission</th>
-            <th>Type</th>
-            <th>Delta</th>
-            <th>Risk Level</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="perm in scanReport.permissions" :key="perm.name">
-            <td class="font-mono">{{ perm.name }}</td>
-            <td>{{ perm.group }}</td>
-            <td>
-              <span class="badge" :class="perm.isNew ? 'badge-new' : 'badge-existing'">
-                {{ perm.isNew ? '+ Added' : 'Unchanged' }}
-              </span>
-            </td>
-            <td>
-              <span class="risk-tag" :class="'risk-' + perm.risk.toLowerCase()">{{ perm.risk }}</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+        <div v-if="report.raw_report" class="perm-diff-box">
+          <h4>3. Raw Scanner Report</h4>
+          <pre class="raw-report">{{ report.raw_report }}</pre>
+        </div>
 
-    <!-- Decision Controls -->
-    <div class="decision-actions">
-      <button @click="quarantineArtifact" class="btn btn-danger">
-        Quarantine & Reject Binary
-      </button>
-      <button 
-        @click="approveSecurity" 
-        class="btn btn-primary"
-        :disabled="scanReport.malwareDetections.length > 0 || scanReport.isCertBlacklisted"
-      >
-        Approve Security Clearance
-      </button>
-    </div>
+        <div class="decision-actions">
+          <router-link to="/security/kill-switch" class="btn btn-secondary">
+            Open Kill-Switch Console
+          </router-link>
+          <router-link to="/apps/metadata" class="btn btn-primary">
+            Continue to Metadata Review
+          </router-link>
+        </div>
+      </template>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { getSharedClient, ApiClientError } from '@bookingnetwork/api-client';
 
-const scanReport = ref({
-  verdict: 'MANUAL_REVIEW_REQUIRED',
-  permissionRiskScore: 45,
-  isCertBlacklisted: false,
-  malwareDetections: [] as Array<{ ruleName: string; severity: string; category: string }>,
-  permissions: [
-    { name: 'android.permission.INTERNET', group: 'Network', isNew: false, risk: 'LOW' },
-    { name: 'android.permission.ACCESS_FINE_LOCATION', group: 'Location', isNew: true, risk: 'HIGH' },
-    { name: 'android.permission.POST_NOTIFICATIONS', group: 'Notifications', isNew: false, risk: 'LOW' },
-    { name: 'android.permission.CAMERA', group: 'Hardware', isNew: true, risk: 'HIGH' }
-  ]
-});
+const api = getSharedClient();
+
+interface ScanReport {
+  id: string;
+  artifact_id: string;
+  scanner_engine_version: string;
+  clamav_status: string;
+  yara_matched_rules: string[];
+  dangerous_permissions: string[];
+  impersonation_similarity_score: number;
+  risk_score: number;
+  scan_verdict: string;
+  raw_report: string;
+  scanned_at: string;
+}
+
+const scans = ref<ScanReport[]>([]);
+const activeArtifactId = ref('');
+const report = ref<ScanReport | null>(null);
+const isLoading = ref(true);
+const loadError = ref('');
 
 const overallVerdictClass = computed(() => {
-  if (scanReport.value.malwareDetections.length > 0 || scanReport.value.isCertBlacklisted) return 'verdict-danger';
-  if (scanReport.value.permissionRiskScore >= 70) return 'verdict-warning';
+  if (!report.value) return 'verdict-clean';
+  if (report.value.scan_verdict === 'INFECTED_QUARANTINED' || report.value.clamav_status === 'INFECTED') return 'verdict-danger';
+  if (report.value.scan_verdict === 'CLEAN_HIGH_RISK_MANUAL_REVIEW' || report.value.risk_score >= 70) return 'verdict-warning';
   return 'verdict-clean';
 });
 
-const verdictIcon = computed(() => {
-  if (scanReport.value.malwareDetections.length > 0 || scanReport.value.isCertBlacklisted) return '🚨';
-  if (scanReport.value.permissionRiskScore >= 70) return '⚠️';
-  return '🛡️';
-});
-
 const verdictDescription = computed(() => {
-  if (scanReport.value.malwareDetections.length > 0) return 'Critical threat detected. Quarantine required.';
-  if (scanReport.value.permissionRiskScore >= 70) return 'High permission risk detected. Review justification.';
+  if (!report.value) return '';
+  if (report.value.scan_verdict === 'INFECTED_QUARANTINED') return 'Critical threat detected. Artifact is quarantined.';
+  if (report.value.scan_verdict === 'CLEAN_HIGH_RISK_MANUAL_REVIEW') return 'Clean signatures but high risk. Manual review required.';
+  if (report.value.scan_verdict === 'SCAN_ERROR') return 'Scanner error. Re-run the pipeline or inspect manually.';
   return 'Static signatures clean. Permission delta acceptable.';
 });
 
 const riskScoreClass = computed(() => {
-  if (scanReport.value.permissionRiskScore >= 70) return 'text-danger';
-  if (scanReport.value.permissionRiskScore >= 40) return 'text-warning';
+  const score = report.value?.risk_score ?? 0;
+  if (score >= 70) return 'text-danger';
+  if (score >= 40) return 'text-warning';
   return 'text-success';
 });
 
-async function quarantineArtifact() {
-  const reason = prompt('Enter reason for security quarantine:');
-  if (!reason) return;
-  alert('Artifact quarantined and developer notified.');
-}
+onMounted(async () => {
+  try {
+    scans.value = await api.listScans() as ScanReport[];
+    if (scans.value.length > 0) {
+      activeArtifactId.value = scans.value[scans.value.length - 1].artifact_id;
+      await loadReport();
+    }
+  } catch (err) {
+    loadError.value = err instanceof ApiClientError ? err.message : 'Failed to load scan reports';
+  } finally {
+    isLoading.value = false;
+  }
+});
 
-async function approveSecurity() {
-  alert('Security clearance approved.');
+async function loadReport() {
+  if (!activeArtifactId.value) return;
+  try {
+    report.value = await api.getScanReport(activeArtifactId.value) as ScanReport;
+  } catch (err) {
+    loadError.value = err instanceof ApiClientError ? err.message : 'Failed to load scan report';
+  }
 }
 </script>
 
@@ -165,6 +167,41 @@ async function approveSecurity() {
   color: #64748b;
   font-size: 14px;
 }
+.queue-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.queue-bar select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+  min-width: 320px;
+}
+.loading-row {
+  padding: 16px;
+  color: #64748b;
+  font-size: 14px;
+}
+.load-error {
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.empty-row {
+  padding: 24px;
+  color: #64748b;
+  font-size: 14px;
+  text-align: center;
+}
 .security-card {
   display: flex;
   align-items: center;
@@ -176,7 +213,6 @@ async function approveSecurity() {
 .verdict-clean { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
 .verdict-warning { background: #fffbeb; border: 1px solid #fef3c7; color: #92400e; }
 .verdict-danger { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
-.card-icon { font-size: 36px; }
 .card-info { flex: 1; }
 .card-info h3 { margin: 0 0 4px 0; }
 .card-info p { margin: 0; font-size: 13px; }
@@ -206,16 +242,16 @@ async function approveSecurity() {
 .cert-item { margin-bottom: 10px; }
 .cert-item label { font-size: 11px; color: #64748b; text-transform: uppercase; display: block; }
 .cert-item .val { font-size: 13px; font-weight: 500; }
-.perm-desc { font-size: 12px; color: #64748b; margin-bottom: 16px; }
-.perm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.perm-table th { text-align: left; padding: 8px; border-bottom: 2px solid #e2e8f0; color: #475569; }
-.perm-table td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; }
-.badge { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.badge-new { background: #fef3c7; color: #b45309; }
-.badge-existing { background: #f1f5f9; color: #64748b; }
-.risk-tag { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.risk-high { background: #fee2e2; color: #991b1b; }
-.risk-low { background: #f0fdf4; color: #166534; }
+.perm-list { margin: 6px 0 0; padding-left: 18px; font-size: 12px; }
+.raw-report {
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 12px;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
 .decision-actions {
   display: flex;
   justify-content: flex-end;
@@ -229,9 +265,9 @@ async function approveSecurity() {
   font-weight: 600;
   cursor: pointer;
   border: none;
+  text-decoration: none;
+  display: inline-block;
 }
 .btn-primary { background: #2563eb; color: white; }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-danger { background: #dc2626; color: white; }
+.btn-secondary { background: #f1f5f9; color: #334155; }
 </style>
-

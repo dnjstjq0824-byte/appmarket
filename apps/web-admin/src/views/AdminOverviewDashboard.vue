@@ -5,37 +5,71 @@
       <p class="bn-text-muted">실시간 활성 사용자, 다운로드 통계, 보안 위협 및 정산 현황을 모니터링합니다.</p>
     </header>
 
+    <div v-if="isLoading" class="bn-loading">불러오는 중…</div>
+    <div v-if="loadError" class="bn-error">{{ loadError }}</div>
+
     <!-- Key Performance Metrics Grid -->
-    <div class="bn-metrics-grid">
+    <div v-if="!isLoading && !loadError" class="bn-metrics-grid">
       <div class="bn-metric-card">
-        <span class="bn-metric-title">실시간 활성 기기 (Active DAU) [시뮬레이션]</span>
-        <strong class="bn-metric-value">1,482,900</strong>
-        <span class="bn-metric-delta positive">+12.4% vs 지난주</span>
+        <span class="bn-metric-title">텔레메트리 이벤트 (최근 24h / 전체)</span>
+        <strong class="bn-metric-value">{{ last24h.toLocaleString() }} / {{ totalEvents.toLocaleString() }}</strong>
+        <span class="bn-metric-delta">수집된 클라이언트 이벤트 기준</span>
       </div>
 
       <div class="bn-metric-card">
-        <span class="bn-metric-title">일일 앱 설치 / 업데이트 [시뮬레이션]</span>
-        <strong class="bn-metric-value">389,120</strong>
-        <span class="bn-metric-delta positive">+8.1%</span>
+        <span class="bn-metric-title">앱 심사 대기열</span>
+        <strong class="bn-metric-value">{{ reviewQueueCount }}건</strong>
+        <span class="bn-metric-delta">메타데이터 심사 대기 중</span>
       </div>
 
       <div class="bn-metric-card">
-        <span class="bn-metric-title">보안 검역 격리된 위협 (24h)</span>
-        <strong class="bn-metric-value warning">14건</strong>
-        <span class="bn-metric-delta">전수 차단 완료</span>
+        <span class="bn-metric-title">활성 킬스위치</span>
+        <strong class="bn-metric-value" :class="{ warning: killSwitchCount > 0 }">{{ killSwitchCount }}건</strong>
+        <span class="bn-metric-delta">배포 차단 중인 패키지</span>
       </div>
 
       <div class="bn-metric-card">
         <span class="bn-metric-title">이중 승인 대기열 (Dual-Control)</span>
-        <strong class="bn-metric-value">2건</strong>
-        <span class="bn-metric-delta">승인 대기 중 (RBAC 큐 연동)</span>
+        <strong class="bn-metric-value">{{ pendingApprovals }}건</strong>
+        <span class="bn-metric-delta">2인 승인 대기 중</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-// Admin Overview Component
+import { onMounted, ref } from 'vue';
+import { getSharedClient, ApiClientError } from '@bookingnetwork/api-client';
+
+const api = getSharedClient();
+
+const isLoading = ref(true);
+const loadError = ref('');
+const totalEvents = ref(0);
+const last24h = ref(0);
+const reviewQueueCount = ref(0);
+const killSwitchCount = ref(0);
+const pendingApprovals = ref(0);
+
+onMounted(async () => {
+  try {
+    const [overview, queue, switches, approvals] = await Promise.all([
+      api.getAnalyticsOverview(),
+      api.getReviewQueue(),
+      api.listKillSwitches(),
+      api.listApprovals()
+    ]);
+    totalEvents.value = overview.totalEvents;
+    last24h.value = overview.last24h;
+    reviewQueueCount.value = (queue as unknown[]).length;
+    killSwitchCount.value = (switches as unknown[]).length;
+    pendingApprovals.value = approvals.length;
+  } catch (err) {
+    loadError.value = err instanceof ApiClientError ? err.message : 'Failed to load overview metrics';
+  } finally {
+    isLoading.value = false;
+  }
+});
 </script>
 
 <style scoped>
@@ -77,6 +111,20 @@
 .bn-metric-delta.positive {
   color: var(--bn-trust-verified, #059669);
   font-weight: 600;
+}
+.bn-loading {
+  padding: 24px;
+  text-align: center;
+  color: var(--bn-text-muted, #64748B);
+}
+.bn-error {
+  padding: 12px 16px;
+  margin-top: 12px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  color: #B91C1C;
+  font-size: 14px;
 }
 </style>
 

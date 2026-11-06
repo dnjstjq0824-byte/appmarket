@@ -15,28 +15,31 @@
     <div class="bn-trust-grid">
       <div class="bn-trust-item">
         <label>APK 무결성 체크섬 (SHA-256)</label>
-        <BnHashFingerprintBadge :hash="apkSha256 || '9c3a8b12...'" />
+        <BnHashFingerprintBadge v-if="apkSha256" :hash="apkSha256" />
+        <span v-else class="bn-scan-result">미등록</span>
       </div>
 
       <div class="bn-trust-item">
         <label>개발자 서명 인증서 지문</label>
-        <BnHashFingerprintBadge :hash="signingCertSha256 || 'e4b1029c...'" />
+        <BnHashFingerprintBadge v-if="signingCertSha256" :hash="signingCertSha256" />
+        <span v-else class="bn-scan-result">미등록</span>
       </div>
 
       <div class="bn-trust-item">
-        <label>악성코드 격리 검사 (ClamAV + YARA)</label>
-        <span class="bn-scan-result">{{ scanReport || '위협 0건 탐지 (정상)' }}</span>
+        <label>악성코드 격리 검사</label>
+        <span class="bn-scan-result">{{ scanReport || '검사 리포트 없음' }}</span>
       </div>
 
       <div class="bn-trust-item">
         <label>요구 권한 위험도 점수</label>
-        <div class="bn-risk-bar-container">
+        <div v-if="riskScore !== undefined" class="bn-risk-bar-container">
           <div
             class="bn-risk-bar"
-            :style="{ width: Math.min(riskScore || 10, 100) + '%', backgroundColor: riskBarColor }"
+            :style="{ width: Math.min(riskScore, 100) + '%', backgroundColor: riskBarColor }"
           ></div>
-          <span class="bn-risk-text">{{ riskScore || 0 }}/100</span>
+          <span class="bn-risk-text">{{ riskScore }}/100</span>
         </div>
+        <span v-else class="bn-scan-result">미평가</span>
       </div>
     </div>
 
@@ -75,8 +78,11 @@ const securityStatusLabel = computed(() => {
       return '보안 위협 격리됨 (다운로드 차단)'
     case 'CLEAN_HIGH_RISK_MANUAL_REVIEW':
       return '보안 심층 검토 완료'
-    default:
+    case 'CLEAN_LOW_RISK':
+    case 'CLEAN':
       return '독립 보안 검증 통과 (안전)'
+    default:
+      return '검증 정보 없음'
   }
 })
 

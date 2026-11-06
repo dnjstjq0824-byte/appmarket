@@ -5,6 +5,10 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -76,5 +80,64 @@ func TestPGClient_SandboxSessionGeneration(t *testing.T) {
 	}
 	if res.AmountKRW != 9900 {
 		t.Fatalf("expected 9900, got %d", res.AmountKRW)
+	}
+}
+
+func TestPortOneV2Client_SessionAndSandboxConfirm(t *testing.T) {
+	ctx := context.Background()
+	client := NewPortOneV2Client(PGConfig{
+		Provider:  PGProviderPortOne,
+		ClientKey: "store-test-1",
+		IsLive:    false,
+	})
+	res, err := client.CreateCheckoutSession(ctx, PGSessionRequest{OrderID: "ord-1", AmountKRW: 5000})
+	if err != nil {
+		t.Fatalf("session creation failed: %v", err)
+	}
+	if res.Provider != PGProviderPortOne || res.PaymentKey == "" || res.ClientKey != "store-test-1" {
+		t.Fatalf("unexpected portone session: %+v", res)
+	}
+	if res.CheckoutURL != "" {
+		t.Fatalf("portone session must not set redirect URL, got %q", res.CheckoutURL)
+	}
+	if err := client.ConfirmPayment(ctx, res.PaymentKey, "ord-1", 5000); err != nil {
+		t.Fatalf("sandbox confirm must succeed: %v", err)
+	}
+	if _, err := client.CreateCheckoutSession(ctx, PGSessionRequest{OrderID: "ord-1"}); err == nil {
+		t.Fatalf("expected error for zero amount")
+	}
+}
+
+func TestPortOneV2Client_LiveConfirmVerifiesLedger(t *testing.T) {
+	ctx := context.Background()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/login/api-secret":
+			_, _ = w.Write([]byte(`{"accessToken":"tok-test"}`))
+		case strings.HasPrefix(r.URL.Path, "/payments/pay-ok"):
+			_, _ = w.Write([]byte(`{"status":"PAID","amount":{"total":5000},"orderName":"License"}`))
+		case strings.HasPrefix(r.URL.Path, "/payments/pay-wrong-amount"):
+			_, _ = w.Write([]byte(`{"status":"PAID","amount":{"total":1},"orderName":"License"}`))
+		default:
+			_, _ = w.Write([]byte(`{"status":"FAILED","amount":{"total":5000},"orderName":"License"}`))
+		}
+	}))
+	defer server.Close()
+
+	client := NewPortOneV2Client(PGConfig{
+		Provider:  PGProviderPortOne,
+		SecretKey: "live-secret",
+		BaseURL:   server.URL,
+		IsLive:    true,
+	})
+	if err := client.ConfirmPayment(ctx, "pay-ok", "ord-1", 5000); err != nil {
+		t.Fatalf("expected live confirm success: %v", err)
+	}
+	if err := client.ConfirmPayment(ctx, "pay-wrong-amount", "ord-1", 5000); err == nil {
+		t.Fatalf("expected amount-mismatch rejection")
+	}
+	if !errors.Is(client.ConfirmPayment(ctx, "pay-failed", "ord-1", 5000), ErrPGPaymentCancelled) {
+		t.Fatalf("expected ErrPGPaymentCancelled for FAILED payment")
 	}
 }

@@ -5,46 +5,69 @@
       <p class="subtitle">F-Droid Index v2 GPG synchronization, partner feeds, and 5-tier rights provenance monitoring</p>
     </div>
 
+    <div class="toolbar">
+      <button @click="showRegister = !showRegister" class="btn btn-secondary btn-sm">
+        {{ showRegister ? 'Cancel' : '+ Register Connector' }}
+      </button>
+    </div>
+
+    <form v-if="showRegister" class="register-card" @submit.prevent="registerConnector">
+      <div class="form-grid">
+        <label>ID <input v-model="regForm.id" required placeholder="partner-x" /></label>
+        <label>Name <input v-model="regForm.name" required placeholder="Partner X Feed" /></label>
+        <label>Kind <input v-model="regForm.kind" required placeholder="FDROID | PARTNER | OFFICIAL_LINK" /></label>
+        <label>Feed URL <input v-model="regForm.feedUrl" placeholder="https://..." /></label>
+        <label>Fingerprint <input v-model="regForm.fingerprint" placeholder="GPG fingerprint" /></label>
+        <label>Packages (comma separated) <input v-model="regForm.packages" placeholder="com.x.app" /></label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm" :disabled="isRegistering">
+        {{ isRegistering ? 'Registering…' : 'Register' }}
+      </button>
+    </form>
+
+    <div v-if="isLoading" class="loading-row">Loading connectors…</div>
+    <div v-if="loadError" class="load-error">{{ loadError }}</div>
+    <div v-if="actionError" class="load-error">{{ actionError }}</div>
+
     <!-- Connector Status Grid -->
-    <div class="connectors-grid">
+    <div v-if="!isLoading && !loadError" class="connectors-grid">
       <div v-for="connector in connectors" :key="connector.id" class="connector-card">
         <div class="connector-header">
           <div>
             <h3>{{ connector.name }}</h3>
-            <span class="font-mono text-xs text-muted">{{ connector.url }}</span>
+            <span class="font-mono text-xs text-muted">{{ connector.feedUrl || connector.kind }}</span>
           </div>
-          <span class="badge" :class="connector.status === 'HEALTHY' ? 'badge-success' : 'badge-danger'">
-            {{ connector.status }}
+          <span class="badge" :class="connector.syncable ? 'badge-success' : 'badge-muted'">
+            {{ connector.syncable ? 'SYNCABLE' : 'LINK ONLY' }}
           </span>
         </div>
 
         <div class="stats-row">
           <div class="stat-pill">
-            <label>GPG Signature</label>
-            <span class="text-success font-bold font-mono">✓ Validated</span>
+            <label>Kind</label>
+            <span class="font-bold font-mono">{{ connector.kind }}</span>
           </div>
           <div class="stat-pill">
-            <label>Indexed Apps</label>
-            <span class="font-mono font-bold">{{ connector.indexedApps.toLocaleString() }}</span>
+            <label>Last Item Count</label>
+            <span class="font-mono font-bold">{{ (connector.lastItemCount ?? 0).toLocaleString() }}</span>
           </div>
           <div class="stat-pill">
-            <label>Rights Level</label>
-            <span class="font-bold">{{ connector.rightsTier }}</span>
+            <label>Last Sync</label>
+            <span class="font-bold text-xs">{{ connector.lastSyncAt || 'Never' }}</span>
           </div>
         </div>
 
-        <div class="sync-meta">
-          <span>Last Synced: {{ connector.lastSyncTime }}</span>
-          <span v-if="connector.syncErrors > 0" class="text-danger">Errors: {{ connector.syncErrors }}</span>
+        <div v-if="lastResult[connector.id]" class="sync-result">
+          Last sync: {{ lastResult[connector.id] }}
         </div>
 
         <div class="card-footer">
-          <button 
-            @click="triggerSync(connector.id)" 
+          <button
+            @click="triggerSync(connector.id)"
             class="btn btn-primary btn-sm"
-            :disabled="connector.isSyncing"
+            :disabled="syncing[connector.id] || !connector.syncable"
           >
-            {{ connector.isSyncing ? 'Syncing Index...' : '⚡ Trigger Sync Now' }}
+            {{ syncing[connector.id] ? 'Syncing Index...' : 'Trigger Sync Now' }}
           </button>
         </div>
       </div>
@@ -82,49 +105,79 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
+import { getSharedClient, ApiClientError } from '@bookingnetwork/api-client';
 
-const connectors = ref([
-  {
-    id: 'conn-fdroid-main',
-    name: 'F-Droid Main Repository (Index v2)',
-    url: 'https://f-droid.org/repo/index-v2.json',
-    status: 'HEALTHY',
-    indexedApps: 4892,
-    rightsTier: 'Tier 2 (OS Mirror)',
-    lastSyncTime: '12 minutes ago',
-    syncErrors: 0,
-    isSyncing: false
-  },
-  {
-    id: 'conn-fdroid-archive',
-    name: 'F-Droid Archive Feed',
-    url: 'https://f-droid.org/archive/index-v2.json',
-    status: 'HEALTHY',
-    indexedApps: 18450,
-    rightsTier: 'Tier 3 (Metadata Only)',
-    lastSyncTime: '1 hour ago',
-    syncErrors: 0,
-    isSyncing: false
+const api = getSharedClient();
+
+interface Connector {
+  id: string;
+  name: string;
+  kind: string;
+  feedUrl?: string;
+  syncable: boolean;
+  lastSyncAt?: string;
+  lastItemCount?: number;
+}
+
+const connectors = ref<Connector[]>([]);
+const syncing = ref<Record<string, boolean>>({});
+const lastResult = ref<Record<string, string>>({});
+const isLoading = ref(true);
+const loadError = ref('');
+const actionError = ref('');
+
+const regForm = ref({ id: '', name: '', kind: 'FDROID', feedUrl: '', fingerprint: '', packages: '' });
+const showRegister = ref(false);
+const isRegistering = ref(false);
+
+onMounted(async () => {
+  await loadConnectors();
+  isLoading.value = false;
+});
+
+async function loadConnectors() {
+  loadError.value = '';
+  try {
+    connectors.value = await api.listConnectors() as Connector[];
+  } catch (err) {
+    loadError.value = err instanceof ApiClientError ? err.message : 'Failed to load connectors';
   }
-]);
+}
 
 async function triggerSync(id: string) {
-  const item = connectors.value.find(c => c.id === id);
-  if (!item) return;
-  item.isSyncing = true;
+  syncing.value[id] = true;
+  actionError.value = '';
   try {
-    const res = await fetch(`/api/v1/admin/connectors/${id}/trigger-sync`, {
-      method: 'POST'
-    });
-    if (res.ok) {
-      item.lastSyncTime = 'Just now';
-      alert(`Sync triggered for ${item.name}`);
-    }
+    const res = await api.triggerConnectorSync(id) as { syncedAt: string; itemCount: number };
+    lastResult.value[id] = `${res.itemCount} items at ${res.syncedAt}`;
+    await loadConnectors();
   } catch (err) {
-    console.error(err);
+    actionError.value = err instanceof ApiClientError ? err.message : `Sync failed for ${id}`;
   } finally {
-    item.isSyncing = false;
+    syncing.value[id] = false;
+  }
+}
+
+async function registerConnector() {
+  isRegistering.value = true;
+  actionError.value = '';
+  try {
+    await api.registerConnector({
+      id: regForm.value.id.trim(),
+      name: regForm.value.name.trim(),
+      kind: regForm.value.kind.trim(),
+      feedUrl: regForm.value.feedUrl.trim() || undefined,
+      fingerprint: regForm.value.fingerprint.trim() || undefined,
+      packages: regForm.value.packages.split(',').map(p => p.trim()).filter(Boolean)
+    });
+    regForm.value = { id: '', name: '', kind: 'FDROID', feedUrl: '', fingerprint: '', packages: '' };
+    showRegister.value = false;
+    await loadConnectors();
+  } catch (err) {
+    actionError.value = err instanceof ApiClientError ? err.message : 'Failed to register connector';
+  } finally {
+    isRegistering.value = false;
   }
 }
 </script>
@@ -242,6 +295,62 @@ async function triggerSync(id: string) {
 }
 .badge-success { background: #dcfce7; color: #166534; }
 .badge-danger { background: #fee2e2; color: #991b1b; }
+.badge-muted { background: #f1f5f9; color: #64748b; }
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+.register-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+.form-grid input {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 400;
+}
+.loading-row {
+  padding: 16px;
+  color: #64748b;
+  font-size: 14px;
+}
+.load-error {
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.sync-result {
+  font-size: 12px;
+  color: #166534;
+  background: #f0fdf4;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
 .btn {
   padding: 6px 14px;
   border-radius: 6px;
@@ -251,6 +360,7 @@ async function triggerSync(id: string) {
 }
 .btn-primary { background: #2563eb; color: white; }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { background: #f1f5f9; color: #334155; }
 .btn-sm { font-size: 12px; }
 .font-mono { font-family: monospace; }
 .text-success { color: #16a34a; }

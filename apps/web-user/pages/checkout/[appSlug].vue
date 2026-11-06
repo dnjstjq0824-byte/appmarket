@@ -1,88 +1,81 @@
 <template>
-  <div class="checkout-page min-h-screen bg-slate-950 text-slate-100 p-6 md:p-12">
-    <div class="max-w-2xl mx-auto">
+  <div class="co-page">
+    <div class="co-wrap">
       <!-- Breadcrumb & Title -->
-      <div class="mb-6">
-        <a href="/" class="text-xs text-sky-400 hover:underline">← 마켓 둘러보기로 돌아가기</a>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-100 mt-2">유료 앱 주문 및 안전 결제 (USR-13)</h1>
-        <p class="text-xs text-slate-400 mt-1">구매 즉시 다운로드 권한이 부여되며, 영구 라이선스로 관리됩니다.</p>
+      <div class="co-head">
+        <a href="/" class="co-back">← 마켓 둘러보기로 돌아가기</a>
+        <h1 class="co-title">유료 앱 주문 및 안전 결제 (USR-13)</h1>
+        <p class="co-sub">구매 즉시 다운로드 권한이 부여되며, 영구 라이선스로 관리됩니다.</p>
       </div>
 
+      <div v-if="isLoading" class="co-status">주문 정보를 불러오는 중…</div>
+      <div v-if="loadError" class="co-load-error">{{ loadError }}</div>
+
       <!-- App Card Summary -->
-      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 mb-6 flex gap-4 items-center">
-        <div class="w-16 h-16 bg-gradient-to-br from-indigo-500 to-sky-600 rounded-xl flex items-center justify-center text-2xl font-bold shadow-lg">
-          {{ appInfo.iconLetter }}
-        </div>
-        <div class="flex-1">
-          <div class="text-xs text-sky-400 font-medium">{{ appInfo.developerName }}</div>
-          <h2 class="text-lg font-bold text-slate-100">{{ appInfo.title }}</h2>
-          <div class="text-xs text-slate-400 mt-0.5 font-mono">패키지: {{ appInfo.packageName }} • v{{ appInfo.version }}</div>
+      <div class="co-card co-app">
+        <div class="co-icon">{{ appInfo.iconLetter }}</div>
+        <div class="co-app-info">
+          <div class="co-dev">{{ appInfo.developerName }}</div>
+          <h2 class="co-app-title">{{ appInfo.title }}</h2>
+          <div class="co-pkg">패키지: {{ appInfo.packageName }} • v{{ appInfo.version }}</div>
         </div>
       </div>
 
       <!-- Order Quote & Price Breakdown -->
-      <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
-        <h3 class="text-sm font-semibold text-slate-200 mb-4">결제 금액 산출서 (Order Quote)</h3>
+      <div class="co-card">
+        <h3 class="co-card-title">결제 금액 산출서 (Order Quote)</h3>
 
-        <div class="space-y-3 font-mono text-xs">
-          <div class="flex justify-between text-slate-300">
+        <div class="co-quote">
+          <div class="co-row">
             <span>앱 정가 (Gross List Price)</span>
             <span>₩{{ basePriceWon.toLocaleString() }}</span>
           </div>
 
-          <div v-if="discountWon > 0" class="flex justify-between text-emerald-400">
+          <div v-if="discountWon > 0" class="co-row co-discount">
             <span>프로모션 할인 적용 ({{ appliedPromoCode }})</span>
             <span>- ₩{{ discountWon.toLocaleString() }}</span>
           </div>
 
-          <div class="flex justify-between text-slate-400 pt-2 border-t border-slate-800">
+          <div class="co-row co-dim co-divide">
             <span>공급가액 (Net Amount)</span>
             <span>₩{{ netAmountWon.toLocaleString() }}</span>
           </div>
 
-          <div class="flex justify-between text-slate-400">
+          <div class="co-row co-dim">
             <span>부가가치세 10% (VAT)</span>
             <span>₩{{ vatAmountWon.toLocaleString() }}</span>
           </div>
 
-          <div class="flex justify-between text-base font-bold text-slate-100 pt-3 border-t border-slate-700">
+          <div class="co-row co-total">
             <span>최종 결제 금액 (Payable)</span>
-            <span class="text-sky-400">₩{{ finalPayableWon.toLocaleString() }}</span>
+            <span class="co-total-amount">₩{{ finalPayableWon.toLocaleString() }}</span>
           </div>
         </div>
 
         <!-- Promo Code Input Component -->
-        <div class="mt-6">
-          <PromoRedeemInput @applied="onPromoApplied" @removed="onPromoRemoved" />
+        <div class="co-promo">
+          <PromoRedeemInput :app-id="appId" @applied="onPromoApplied" @removed="onPromoRemoved" />
         </div>
+        <div v-if="orderError" class="co-order-error">{{ orderError }}</div>
       </div>
 
       <!-- Payment Method Selection -->
-      <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 mb-6">
-        <h3 class="text-sm font-semibold text-slate-200 mb-4">결제 수단 선택</h3>
-        
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-          <button 
-            v-for="pm in paymentMethods" 
-            :key="pm.id"
-            @click="selectedMethod = pm.id"
-            :class="['p-3 rounded-lg border text-center transition font-medium', selectedMethod === pm.id ? 'bg-sky-950 border-sky-500 text-sky-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700']"
-          >
-            {{ pm.name }}
-          </button>
-        </div>
-
-        <div class="mt-4 text-[11px] text-slate-500">
-          안내: PG사 웹훅 HMAC-SHA256 서명 검증을 통해 100% 무결성이 보장되며 멱등 처리됩니다.
+      <div class="co-card">
+        <h3 class="co-card-title">결제 진행 방식</h3>
+        <p class="co-note">
+          주문 생성 후 PG사 결제창으로 이동합니다. PG사 웹훅 HMAC-SHA256 서명 검증으로 무결성이 보장되며 멱등 처리됩니다.
+        </p>
+        <div v-if="checkoutProvider" class="co-provider">
+          결제 대행사: <strong>{{ checkoutProvider }}</strong>
         </div>
       </div>
 
       <!-- Checkout CTA -->
-      <div class="space-y-3">
-        <button 
+      <div class="co-cta">
+        <button
           @click="executePayment"
-          :disabled="isProcessing"
-          class="w-full py-3.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 disabled:from-slate-800 disabled:to-slate-800 text-white font-bold rounded-xl shadow-lg transition text-sm flex items-center justify-center gap-2"
+          :disabled="isProcessing || isLoading || !appId || basePriceWon <= 0 || !releaseId"
+          class="co-pay-btn"
         >
           <span v-if="isProcessing">결제 승인 처리 중...</span>
           <span v-else>
@@ -90,39 +83,31 @@
           </span>
         </button>
 
-        <p class="text-center text-[11px] text-slate-500">
+        <p class="co-fineprint">
           구매 후 14일 이내 미다운로드 시 전액 환불(청약철회) 가능합니다.
         </p>
       </div>
 
       <!-- Purchase Success Dialog -->
-      <div v-if="purchaseSuccess" class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-        <div class="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-md w-full text-center">
-          <div class="w-12 h-12 bg-emerald-950 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl border border-emerald-500/40">
-            ✓
-          </div>
-          <h3 class="text-lg font-bold text-slate-100 mb-1">결제 완료 및 소유 권한 발급</h3>
-          <p class="text-xs text-slate-400 mb-6">
+      <div v-if="purchaseSuccess" class="co-dialog-backdrop">
+        <div class="co-dialog">
+          <div class="co-dialog-check">✓</div>
+          <h3 class="co-dialog-title">결제 완료 및 소유 권한 발급</h3>
+          <p class="co-dialog-desc">
             [{{ appInfo.title }}]의 정품 라이선스가 발급되었습니다. 지금 바로 고속 CDN을 통해 안전하게 다운로드하세요.
           </p>
 
-          <div class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-left mb-6 space-y-1">
-            <div class="text-slate-400">주문 번호: <span class="text-sky-400">{{ orderId }}</span></div>
-            <div class="text-slate-400">결제 금액: ₩{{ finalPayableWon.toLocaleString() }}</div>
-            <div class="text-slate-400">권한 상태: <span class="text-emerald-400 font-bold">ACTIVE (인증됨)</span></div>
+          <div class="co-receipt">
+            <div>주문 번호: <span class="co-receipt-hl">{{ orderId }}</span></div>
+            <div>결제 금액: ₩{{ finalPayableWon.toLocaleString() }}</div>
+            <div>권한 상태: <span class="co-receipt-active">ACTIVE (인증됨)</span></div>
           </div>
 
-          <div class="space-y-2">
-            <a 
-              :href="downloadUrl" 
-              class="block w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition"
-            >
+          <div class="co-dialog-actions">
+            <a :href="downloadUrl" class="co-download-btn">
               APK 다운로드 시작 (15분 유효 서명 토큰)
             </a>
-            <a 
-              href="/account/library" 
-              class="block w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition"
-            >
+            <a href="/account/library" class="co-library-btn">
               내 보관함으로 이동
             </a>
           </div>
@@ -133,43 +118,51 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { getSharedClient, ApiClientError } from '@bookingnetwork/api-client';
 import PromoRedeemInput from '../../components/PromoRedeemInput.vue';
 
-const appInfo = ref({
-  title: 'Vector Pro Studio for Android',
-  developerName: 'Creative Design Labs',
-  packageName: 'com.creativedesign.vectorpro',
-  version: '2.4.0',
-  iconLetter: 'V'
-});
+const api = getSharedClient();
+const route = useRoute();
+const router = useRouter();
+const slug = route.params.appSlug as string;
 
-const basePriceWon = ref(15000);
+const appInfo = ref({
+  title: '',
+  developerName: '',
+  packageName: '',
+  version: '',
+  iconLetter: '?'
+});
+const appId = ref('');
+const releaseId = ref('');
+const isLoading = ref(true);
+const loadError = ref('');
+
+const basePriceWon = ref(0);
 const discountWon = ref(0);
 const appliedPromoCode = ref('');
-const selectedMethod = ref('TOSS_PAY');
 const isProcessing = ref(false);
 const purchaseSuccess = ref(false);
 const orderId = ref('');
 const downloadUrl = ref('');
-
-const paymentMethods = [
-  { id: 'TOSS_PAY', name: '토스페이' },
-  { id: 'CREDIT_CARD', name: '신용/체크카드' },
-  { id: 'NAVER_PAY', name: '네이버페이' },
-  { id: 'KAKAO_PAY', name: '카카오페이' }
-];
+const orderError = ref('');
+const checkoutProvider = ref('');
+const idempotencyKey = ref('');
 
 const finalPayableWon = computed(() => Math.max(0, basePriceWon.value - discountWon.value));
 const netAmountWon = computed(() => Math.floor((finalPayableWon.value * 10000) / 11000));
 const vatAmountWon = computed(() => finalPayableWon.value - netAmountWon.value);
 
-function onPromoApplied(promo: { code: string; type: 'FREE' | 'PERCENT'; percent?: number }) {
+function onPromoApplied(promo: { code: string; type: 'FREE' | 'PERCENT' | 'FIXED'; percent?: number; fixedMinor?: number }) {
   appliedPromoCode.value = promo.code;
   if (promo.type === 'FREE') {
     discountWon.value = basePriceWon.value;
   } else if (promo.type === 'PERCENT' && promo.percent) {
-    discountWon.value = Math.floor((basePriceWon.value * promo.percent) / 100);
+    discountWon.value = basePriceWon.value - Math.floor((basePriceWon.value * (100 - promo.percent)) / 100);
+  } else if (promo.type === 'FIXED' && promo.fixedMinor) {
+    discountWon.value = Math.min(basePriceWon.value, promo.fixedMinor);
   }
 }
 
@@ -178,14 +171,332 @@ function onPromoRemoved() {
   discountWon.value = 0;
 }
 
-function executePayment() {
-  isProcessing.value = true;
-  setTimeout(() => {
-    isProcessing.value = false;
-    orderId.value = `ord-${Date.now()}`;
-    downloadUrl.value = `/api/v1/distribution/download/tokenized?pkg=${appInfo.value.packageName}&token=hmac_mock_signed_token_15m`;
-    purchaseSuccess.value = true;
-  }, 500);
+function deviceId(): string {
+  if (typeof window === 'undefined') return 'ssr-device';
+  let id = localStorage.getItem('bn_device_id');
+  if (!id) {
+    id = 'dev-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem('bn_device_id', id);
+  }
+  return id;
 }
+
+async function executePayment() {
+  if (!appId.value || basePriceWon.value <= 0) return;
+  isProcessing.value = true;
+  orderError.value = '';
+  try {
+    if (!idempotencyKey.value) {
+      idempotencyKey.value = 'co-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+    }
+    const order = await api.createOrder({
+      app_id: appId.value,
+      gross_amount: finalPayableWon.value,
+      currency: 'KRW',
+      idempotency_key: idempotencyKey.value,
+      promo_code: appliedPromoCode.value || undefined
+    });
+    orderId.value = order.id;
+    if (order.status === 'PAID') {
+      const signed = await api.createDownloadToken(order.app_id, releaseId.value, deviceId());
+      downloadUrl.value = signed.url;
+      purchaseSuccess.value = true;
+      return;
+    }
+    const session = await api.checkoutOrder(order.id);
+    checkoutProvider.value = session.provider;
+    if (typeof window !== 'undefined') {
+      window.location.href = session.checkout_url;
+    }
+  } catch (err) {
+    if (err instanceof ApiClientError && err.status === 401) {
+      await router.push({ path: '/account/login', query: { redirect: route.fullPath } });
+      return;
+    }
+    orderError.value = err instanceof ApiClientError ? err.message : '주문 생성에 실패했습니다.';
+  } finally {
+    isProcessing.value = false;
+  }
+}
+
+onMounted(async () => {
+  try {
+    const detail = await api.getAppBySlug(slug);
+    appId.value = detail.app.id;
+    const dist = detail.distributions[0];
+    releaseId.value = dist?.latest_release?.id || '';
+    appInfo.value = {
+      title: detail.localization?.title || detail.app.canonical_slug,
+      developerName: detail.app.developer_org_id || detail.app.primary_package_name,
+      packageName: detail.app.primary_package_name,
+      version: dist?.latest_release?.version_name || '',
+      iconLetter: (detail.localization?.title || '?').trim().slice(0, 1).toUpperCase()
+    };
+    const tiers = await api.getAppPrices(detail.app.id);
+    const krw = tiers.find(t => t.currency === 'KRW') || tiers[0];
+    if (!krw) {
+      loadError.value = '이 앱에는 등록된 가격이 없습니다.';
+      return;
+    }
+    basePriceWon.value = krw.list_price_minor;
+  } catch (err) {
+    loadError.value = err instanceof ApiClientError ? err.message : '주문 정보를 불러오지 못했습니다.';
+  } finally {
+    isLoading.value = false;
+  }
+});
 </script>
+
+<style scoped>
+.co-page {
+  min-height: 100vh;
+  background: #020617;
+  color: #f1f5f9;
+  padding: 24px;
+}
+@media (min-width: 768px) {
+  .co-page { padding: 48px; }
+}
+.co-wrap {
+  max-width: 672px;
+  margin: 0 auto;
+}
+.co-head { margin-bottom: 24px; }
+.co-back {
+  font-size: 12px;
+  color: #38bdf8;
+  text-decoration: none;
+}
+.co-back:hover { text-decoration: underline; }
+.co-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f1f5f9;
+  margin: 8px 0 0;
+}
+.co-sub {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+.co-status {
+  font-size: 14px;
+  color: #94a3b8;
+  margin-bottom: 24px;
+}
+.co-load-error {
+  font-size: 14px;
+  color: #fb7185;
+  background: #4c0519;
+  border: 1px solid #881337;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 24px;
+}
+.co-card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.co-app {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 20px;
+}
+.co-icon {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #6366f1, #0284c7);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+.co-app-info { flex: 1; }
+.co-dev {
+  font-size: 12px;
+  color: #38bdf8;
+  font-weight: 500;
+}
+.co-app-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0;
+}
+.co-pkg {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 2px;
+  font-family: monospace;
+}
+.co-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0 0 16px;
+}
+.co-quote {
+  font-family: monospace;
+  font-size: 12px;
+}
+.co-quote > div + div { margin-top: 12px; }
+.co-row {
+  display: flex;
+  justify-content: space-between;
+  color: #cbd5e1;
+}
+.co-discount { color: #34d399; }
+.co-dim { color: #94a3b8; }
+.co-divide {
+  padding-top: 8px;
+  border-top: 1px solid #1e293b;
+}
+.co-total {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f1f5f9;
+  padding-top: 12px;
+  border-top: 1px solid #334155;
+}
+.co-total-amount { color: #38bdf8; }
+.co-promo { margin-top: 24px; }
+.co-order-error {
+  margin-top: 16px;
+  font-size: 12px;
+  color: #fb7185;
+}
+.co-note {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+}
+.co-provider {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+.co-cta > * + * { margin-top: 12px; }
+.co-pay-btn {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(90deg, #0284c7, #4f46e5);
+  color: #fff;
+  font-weight: 700;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.4);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: filter 0.15s;
+}
+.co-pay-btn:hover { filter: brightness(1.1); }
+.co-pay-btn:disabled {
+  background: #1e293b;
+  cursor: not-allowed;
+  filter: none;
+}
+.co-fineprint {
+  text-align: center;
+  font-size: 11px;
+  color: #64748b;
+}
+.co-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 50;
+}
+.co-dialog {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 448px;
+  width: 100%;
+  text-align: center;
+}
+.co-dialog-check {
+  width: 48px;
+  height: 48px;
+  background: #052e16;
+  color: #34d399;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 24px;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+.co-dialog-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0 0 4px;
+}
+.co-dialog-desc {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0 0 24px;
+}
+.co-receipt {
+  background: #020617;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-family: monospace;
+  text-align: left;
+  margin-bottom: 24px;
+  color: #94a3b8;
+}
+.co-receipt > div + div { margin-top: 4px; }
+.co-receipt-hl { color: #38bdf8; }
+.co-receipt-active {
+  color: #34d399;
+  font-weight: 700;
+}
+.co-dialog-actions > * + * { margin-top: 8px; }
+.co-download-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background: #059669;
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.co-download-btn:hover { background: #10b981; }
+.co-library-btn {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  background: #1e293b;
+  color: #cbd5e1;
+  font-size: 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.co-library-btn:hover { background: #334155; }
+</style>
 

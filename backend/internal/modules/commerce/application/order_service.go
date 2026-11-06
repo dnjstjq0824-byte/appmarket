@@ -22,6 +22,7 @@ type OrderService struct {
 	orders       map[string]*domain.Order
 	entitlements map[string]*domain.UserEntitlement // key: userID + ":" + appID
 	paidAppList  map[string]bool                    // appID -> isPaid
+	byIdemKey    map[string]*domain.Order           // idempotencyKey -> order
 }
 
 func NewOrderService(ledger *LedgerService, webhookSecret string) *OrderService {
@@ -32,6 +33,7 @@ func NewOrderService(ledger *LedgerService, webhookSecret string) *OrderService 
 		orders:        make(map[string]*domain.Order),
 		entitlements:  make(map[string]*domain.UserEntitlement),
 		paidAppList:   make(map[string]bool),
+		byIdemKey:     make(map[string]*domain.Order),
 	}
 }
 
@@ -44,6 +46,13 @@ func (s *OrderService) RegisterPaidApp(appID string) {
 func (s *OrderService) CreateOrder(ctx context.Context, userID, appID, orgID string, grossAmount int64, currency domain.Currency, idempotencyKey string) (*domain.Order, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if idempotencyKey != "" {
+		if existing, ok := s.byIdemKey[idempotencyKey]; ok {
+			copyO := *existing
+			return &copyO, nil
+		}
+	}
 
 	breakdown := s.calculator.CalculateBreakdown(grossAmount)
 
@@ -64,7 +73,42 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID, appID, orgID str
 	}
 
 	s.orders[orderID] = order
-	return order, nil
+	if idempotencyKey != "" {
+		s.byIdemKey[idempotencyKey] = order
+	}
+	copyO := *order
+	return &copyO, nil
+}
+
+// CompleteZeroValueOrder marks a fully-discounted (FREE_REDEEM) order paid and
+// grants the entitlement without a PG round-trip.
+func (s *OrderService) CompleteZeroValueOrder(orderID string) (*domain.Order, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	order, exists := s.orders[orderID]
+	if !exists {
+		return nil, errors.New("order not found")
+	}
+	if order.Status == domain.OrderPaid {
+		copyO := *order
+		return &copyO, nil
+	}
+	if order.Status != domain.OrderPending || order.GrossAmount != 0 {
+		return nil, errors.New("only pending zero-value orders can complete without payment")
+	}
+	now := time.Now().UTC()
+	order.Status = domain.OrderPaid
+	order.PaidAt = &now
+	s.entitlements[order.UserID+":"+order.AppID] = &domain.UserEntitlement{
+		ID:        fmt.Sprintf("ent-%d", now.UnixNano()),
+		UserID:    order.UserID,
+		AppID:     order.AppID,
+		OrderID:   order.ID,
+		Status:    domain.EntitlementActive,
+		GrantedAt: now,
+	}
+	copyO := *order
+	return &copyO, nil
 }
 
 // ProcessPaymentWebhook verifies signature and posts idempotent payment & double-entry ledger
@@ -153,6 +197,25 @@ func (s *OrderService) GetEntitlement(userID, appID string) *domain.UserEntitlem
 	return s.entitlements[userID+":"+appID]
 }
 
+// MarkOrderRefunded transitions the canonical stored order to REFUNDED exactly
+// once. Double refunds fail with ErrOrderAlreadyRefunded.
+func (s *OrderService) MarkOrderRefunded(orderID string) (*domain.Order, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	order, exists := s.orders[orderID]
+	if !exists {
+		return nil, errors.New("order not found")
+	}
+	if order.Status == domain.OrderRefunded {
+		return nil, domain.ErrOrderAlreadyRefunded
+	}
+	now := time.Now().UTC()
+	order.Status = domain.OrderRefunded
+	order.RefundedAt = &now
+	copyO := *order
+	return &copyO, nil
+}
+
 func (s *OrderService) GetOrder(orderID string) (*domain.Order, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -162,6 +225,40 @@ func (s *OrderService) GetOrder(orderID string) (*domain.Order, error) {
 	}
 	copyO := *order
 	return &copyO, nil
+}
+
+func (s *OrderService) ListOrdersByUser(userID string) []domain.Order {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var list []domain.Order
+	for _, o := range s.orders {
+		if o.UserID == userID {
+			list = append(list, *o)
+		}
+	}
+	return list
+}
+
+func (s *OrderService) ListOrdersByOrg(orgID string) []domain.Order {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var list []domain.Order
+	for _, o := range s.orders {
+		if o.OrgID == orgID {
+			list = append(list, *o)
+		}
+	}
+	return list
+}
+
+func (s *OrderService) ListAllOrders() []domain.Order {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	list := make([]domain.Order, 0, len(s.orders))
+	for _, o := range s.orders {
+		list = append(list, *o)
+	}
+	return list
 }
 
 func (s *OrderService) ListUserEntitlements(userID string) []domain.UserEntitlement {

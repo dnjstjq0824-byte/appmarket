@@ -13,6 +13,7 @@ const (
 	StatusUpdateAvailableSignerConflict UpdateResolutionStatus = "UPDATE_AVAILABLE_SIGNER_CONFLICT"
 	StatusIncompatibleDeviceSdkAbi    UpdateResolutionStatus = "INCOMPATIBLE_DEVICE_SDK_ABI"
 	StatusRolloutExcluded             UpdateResolutionStatus = "ROLLOUT_EXCLUDED"
+	StatusDistributionSuspended       UpdateResolutionStatus = "DISTRIBUTION_SUSPENDED"
 )
 
 type DeviceSpec struct {

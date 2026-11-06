@@ -5,9 +5,23 @@
       <p class="subtitle">Secure multipart upload, client-side SHA-256 integrity verification, and binary validation</p>
     </div>
 
+    <!-- Org selector -->
+    <div v-if="orgs.length > 0" class="org-row">
+      <label for="orgSelect">Organization</label>
+      <select id="orgSelect" :value="activeOrgId" @change="selectOrg(($event.target as HTMLSelectElement).value)">
+        <option v-for="org in orgs" :key="org.id" :value="org.id">{{ org.org_name }} ({{ org.verification_status }})</option>
+      </select>
+    </div>
+    <div v-if="orgLoadError" class="alert alert-error">
+      <div class="alert-content">
+        <h4>Failed to load organizations</h4>
+        <p>{{ orgLoadError }}</p>
+      </div>
+    </div>
+
     <!-- KYB Gate Alert if not verified -->
     <div v-if="kybStatus !== 'VERIFIED'" class="kyb-gate-banner" style="background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #fbbf24; font-size: 13px;">
-      <strong>⚠️ 조직 KYB 미검증 상태 (업로드 제한)</strong>
+      <strong>조직 KYB 미검증 상태 (업로드 제한)</strong>
       <p style="margin-top: 4px; color: #d1d5db;">보안 규정에 따라 법인 신원 검증(KYB)이 완료되지 않은 조직은 릴리스 바이너리를 업로드할 수 없습니다. <router-link to="/" style="color: #60a5fa; text-decoration: underline;">[조직 & KYB 인증]</router-link> 페이지에서 서류를 제출해 주십시오.</p>
     </div>
 
@@ -28,7 +42,7 @@
         :disabled="uploadState === 'UPLOADING' || uploadState === 'HASHING' || kybStatus !== 'VERIFIED'"
       />
       <label for="fileInput" class="dropzone-label">
-        <div class="drop-icon">📦</div>
+        <div class="drop-icon" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg></div>
         <div v-if="!selectedFile" class="prompt-text">
           <strong>Drag & Drop APK or AAB bundle here</strong>
           <span>or click to browse from local computer (Max: 4GB)</span>
@@ -57,7 +71,7 @@
 
     <!-- Validation Error Alert -->
     <div v-if="errorMessage" class="alert alert-error">
-      <div class="alert-icon">⚠️</div>
+      <div class="alert-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
       <div class="alert-content">
         <h4>{{ errorCode || 'Validation Error' }}</h4>
         <p>{{ errorMessage }}</p>
@@ -66,6 +80,18 @@
         </div>
       </div>
       <button @click="resetUploader" class="btn btn-sm btn-outline">Try Again</button>
+    </div>
+
+    <!-- Metadata-only completion receipt (edge fallback path) -->
+    <div v-if="uploadReceipt && uploadState === 'COMPLETED'" class="binary-details-card">
+      <div class="card-header">
+        <h3>Binary Received</h3>
+        <span class="badge badge-success">Upload {{ uploadReceipt.uploadId }} · {{ uploadReceipt.status }}</span>
+      </div>
+      <p class="perm-notice">Manifest parsing runs on the connected backend. Reconnect to the full API to inspect extracted metadata.</p>
+      <div class="card-actions">
+        <button @click="resetUploader" class="btn btn-secondary">Upload Another</button>
+      </div>
     </div>
 
     <!-- Extracted Manifest & Binary Details -->
@@ -128,17 +154,39 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { getSharedClient, ApiClientError, type OrgSummary } from '@bookingnetwork/api-client';
 
 type UploadState = 'IDLE' | 'HASHING' | 'UPLOADING' | 'COMPLETED' | 'ERROR';
 
-const kybStatus = ref('UNVERIFIED');
+const router = useRouter();
+const api = getSharedClient();
 
-onMounted(() => {
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('bn_kyb_status');
-    if (saved) kybStatus.value = saved;
+const orgs = ref<OrgSummary[]>([]);
+const activeOrgId = ref('');
+const kybStatus = ref('UNKNOWN');
+const orgLoadError = ref('');
+
+onMounted(async () => {
+  try {
+    orgs.value = await api.listOrgs();
+    if (orgs.value.length > 0) {
+      activeOrgId.value = orgs.value[0].id;
+      kybStatus.value = orgs.value[0].verification_status || 'UNVERIFIED';
+    } else {
+      kybStatus.value = 'NO_ORG';
+    }
+  } catch (err) {
+    kybStatus.value = 'LOAD_FAILED';
+    orgLoadError.value = err instanceof ApiClientError ? err.message : 'Failed to load organizations';
   }
 });
+
+function selectOrg(id: string) {
+  activeOrgId.value = id;
+  const org = orgs.value.find(o => o.id === id);
+  kybStatus.value = org?.verification_status || 'UNVERIFIED';
+}
 
 const isDragging = ref(false);
 const selectedFile = ref<File | null>(null);
@@ -148,6 +196,7 @@ const computedSha256 = ref('');
 const errorMessage = ref('');
 const errorCode = ref('');
 const resolutionGuide = ref('');
+const uploadReceipt = ref<{ uploadId: string; status: string } | null>(null);
 
 const binaryDetails = ref<{
   packageName: string;
@@ -210,68 +259,66 @@ async function processFile(file: File) {
   }
 }
 
+interface CompleteUploadResponse {
+  uploadId: string;
+  status: string;
+  details?: {
+    packageName: string;
+    versionCode: number;
+    versionName: string;
+    minSdk: number;
+    targetSdk: number;
+    sha256: string;
+    certSha256: string;
+    dangerousPermissions: string[];
+  };
+}
+
 async function startMultipartUpload(file: File, sha256: string) {
   uploadState.value = 'UPLOADING';
 
   try {
     // Step 1: Initiate upload session with backend
-    const initRes = await fetch('/api/v1/developer/apps/current/uploads', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileName: file.name,
-        fileSize: file.size,
-        expectedSha256: sha256
-      })
+    const session = await api.initUpload('current', {
+      orgId: activeOrgId.value,
+      fileName: file.name,
+      fileSize: file.size,
+      expectedSha256: sha256
     });
 
-    if (!initRes.ok) {
-      const errData = await initRes.json().catch(() => ({}));
-      throw { code: errData.code || 'INIT_FAILED', message: errData.message || 'Failed to initiate upload session' };
+    // Step 2: Stream real bytes through the quarantine pipeline
+    currentProgress.value = 50;
+    const result = await api.completeUpload('current', session.uploadId, sha256, file) as CompleteUploadResponse;
+    currentProgress.value = 100;
+
+    if (!result.details) {
+      uploadReceipt.value = { uploadId: result.uploadId, status: result.status };
+      uploadState.value = 'COMPLETED';
+      return;
     }
-
-    const { uploadId } = await initRes.json();
-
-    // Step 2: Simulate multi-chunk upload stream with progress
-    for (let p = 50; p <= 100; p += 10) {
-      await new Promise(r => setTimeout(r, 60));
-      currentProgress.value = p;
-    }
-
-    // Step 3: Complete upload and parse binary
-    const completeRes = await fetch(`/api/v1/developer/apps/current/uploads/${uploadId}/complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uploadId, sha256 })
-    });
-
-    if (!completeRes.ok) {
-      const err = await completeRes.json().catch(() => ({}));
-      if (err.code === 'ERR_APK_V2_SIGNATURE_REQUIRED') {
-        errorCode.value = 'ERR_APK_V2_SIGNATURE_REQUIRED';
-        errorMessage.value = 'This APK is signed with APK Signature Scheme v1 only. APK Signature Scheme v2 or v3 is strictly required.';
-        resolutionGuide.value = 'Sign the APK using apksigner from Android SDK Build-Tools 24.0.3+ with flags --v2-signing-enabled true.';
-        uploadState.value = 'ERROR';
-        return;
-      }
-      throw { code: err.code || 'PARSER_FAILED', message: err.message || 'Binary parsing failed' };
-    }
-
-    const result = await completeRes.json();
+    uploadReceipt.value = null;
     binaryDetails.value = {
-      packageName: result.packageName || 'com.example.app',
-      versionCode: result.versionCode || 101,
-      versionName: result.versionName || '1.0.1',
-      minSdk: result.minSdk || 26,
-      targetSdk: result.targetSdk || 34,
-      sha256: sha256,
-      certSha256: result.certSha256 || 'A1B2C3D4E5F6...',
-      dangerousPermissions: result.dangerousPermissions || ['android.permission.RECORD_AUDIO']
+      packageName: result.details.packageName,
+      versionCode: result.details.versionCode,
+      versionName: result.details.versionName,
+      minSdk: result.details.minSdk,
+      targetSdk: result.details.targetSdk,
+      sha256: result.details.sha256 || sha256,
+      certSha256: result.details.certSha256,
+      dangerousPermissions: result.details.dangerousPermissions || []
     };
     uploadState.value = 'COMPLETED';
   } catch (err: any) {
+    const code = err instanceof ApiClientError ? (err.problem?.code || '') : (err.code || '');
+    if (code === 'ERR_APK_V2_SIGNATURE_REQUIRED') {
+      errorCode.value = 'ERR_APK_V2_SIGNATURE_REQUIRED';
+      errorMessage.value = 'This APK is signed with APK Signature Scheme v1 only. APK Signature Scheme v2 or v3 is strictly required.';
+      resolutionGuide.value = 'Sign the APK using apksigner from Android SDK Build-Tools 24.0.3+ with flags --v2-signing-enabled true.';
+      uploadState.value = 'ERROR';
+      return;
+    }
     uploadState.value = 'ERROR';
-    errorCode.value = err.code || 'ERR_UPLOAD_FAILURE';
+    errorCode.value = code || 'ERR_UPLOAD_FAILURE';
     errorMessage.value = err.message || 'An unexpected error occurred during upload.';
   }
 }
@@ -292,10 +339,11 @@ function resetUploader() {
   errorMessage.value = '';
   errorCode.value = '';
   binaryDetails.value = null;
+  uploadReceipt.value = null;
 }
 
 function proceedToRelease() {
-  window.location.hash = '#/releases/staged-rollout';
+  router.push('/releases/rollout');
 }
 
 function formatFileSize(bytes: number): string {
@@ -318,6 +366,20 @@ function formatFileSize(bytes: number): string {
 .subtitle {
   color: #64748b;
   font-size: 14px;
+}
+.org-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.org-row select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
 }
 .upload-dropzone {
   border: 2px dashed #cbd5e1;
@@ -426,6 +488,13 @@ function formatFileSize(bytes: number): string {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
 }
 .badge-success {
   background: #dcfce7;

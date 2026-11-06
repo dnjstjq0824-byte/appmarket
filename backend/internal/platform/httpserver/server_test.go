@@ -82,6 +82,10 @@ func TestReadinessFailsClosedWhileLivenessRemainsAvailable(t *testing.T) {
 		DB: db, Redis: cache, OpenSearchURL: probe.URL, S3HealthURL: probe.URL,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		DisableRateLimit: true,
+		IAMHMACSecret: "test-hmac-secret",
+		DistributionTokenSecret: "test-dist-secret",
+		PGWebhookSecret: "test-pg-secret",
+		PayoutEncryptionKey: "0123456789abcdef0123456789abcdef",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -123,6 +127,10 @@ func TestMountedDomainRoutes(t *testing.T) {
 		DB: db, Redis: cache, OpenSearchURL: probe.URL, S3HealthURL: probe.URL,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		DisableRateLimit: true,
+		IAMHMACSecret: "test-hmac-secret",
+		DistributionTokenSecret: "test-dist-secret",
+		PGWebhookSecret: "test-pg-secret",
+		PayoutEncryptionKey: "0123456789abcdef0123456789abcdef",
 	})
 	if err != nil {
 		t.Fatal(err)

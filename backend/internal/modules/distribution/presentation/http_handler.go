@@ -17,10 +17,15 @@ type CandidateProvider interface {
 	GetCandidatesForPackages(ctx context.Context, packageNames []string) (map[string]domain.CandidateRelease, error)
 }
 
+// KillSwitchValidator reports whether an app or package key is suspended.
+// A non-nil error blocks downloads and updates for that key.
+type KillSwitchValidator func(ctx context.Context, key string) error
+
 // DistributionHandler serves distribution, token, and device update endpoints.
 type DistributionHandler struct {
 	tokenService      *application.DownloadTokenService
 	candidateProvider CandidateProvider
+	killSwitch        KillSwitchValidator
 }
 
 // NewDistributionHandler creates a new DistributionHandler instance.
@@ -32,6 +37,20 @@ func NewDistributionHandler(
 		tokenService:      tokenService,
 		candidateProvider: candidateProvider,
 	}
+}
+
+// WithKillSwitchValidator attaches the emergency takedown check supplied by
+// the composition root. Without it downloads are unguarded (unit-test mode).
+func (h *DistributionHandler) WithKillSwitchValidator(validator KillSwitchValidator) *DistributionHandler {
+	h.killSwitch = validator
+	return h
+}
+
+func (h *DistributionHandler) blocked(ctx context.Context, key string) bool {
+	if h.killSwitch == nil || key == "" {
+		return false
+	}
+	return h.killSwitch(ctx, key) != nil
 }
 
 // Routes mounts the distribution HTTP routes on Chi router.
@@ -53,6 +72,11 @@ type tokenReqBody struct {
 func (h *DistributionHandler) handleGenerateToken(w http.ResponseWriter, r *http.Request) {
 	appID := chi.URLParam(r, "appId")
 	releaseID := chi.URLParam(r, "releaseId")
+
+	if h.blocked(r.Context(), appID) {
+		errors.WriteProblem(w, http.StatusForbidden, "ERR_KILL_SWITCH_ACTIVE", "Application is suspended by emergency kill switch", r.URL.Path)
+		return
+	}
 
 	var body tokenReqBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -121,6 +145,18 @@ func (h *DistributionHandler) handleCheckUpdates(w http.ResponseWriter, r *http.
 	}
 
 	results := domain.BatchResolveUpdates(body.Device, body.Packages, candidates)
+
+	for i := range results {
+		if h.blocked(r.Context(), results[i].PackageName) || h.blocked(r.Context(), results[i].AppID) {
+			results[i].Status = domain.StatusDistributionSuspended
+			results[i].ResolutionReason = "Distribution suspended by emergency kill switch. Uninstall advised."
+			results[i].DownloadURL = ""
+			results[i].SHA256Checksum = ""
+			results[i].SizeBytes = 0
+			results[i].RequiresUserAction = true
+			results[i].DangerousPermissionsNew = nil
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

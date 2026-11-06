@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/moderation/domain"
@@ -62,6 +63,25 @@ func TestTCSEC008VerifiedInstallerReviewsAndAntiFraud(t *testing.T) {
 		}
 	})
 
+	t.Run("Sub-test 2b: Stored review markup is stripped", func(t *testing.T) {
+		rev, err := service.PostReview(ctx, CreateReviewInput{
+			AppID:           appID,
+			UserID:          "user-verified",
+			Rating:          4,
+			Title:           `<script>alert(1)</script>Good`,
+			Comment:         `Nice <a href="javascript:alert(2)">link</a> app`,
+			VersionCode:     102,
+			ClientIP:        "192.168.1.21",
+			AccountAgeHours: 120.0,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if strings.Contains(rev.Title, "<script") || strings.Contains(rev.Comment, "javascript:") {
+			t.Fatalf("stored XSS survived: title=%q comment=%q", rev.Title, rev.Comment)
+		}
+	})
+
 	t.Run("Sub-test 3: Brand new account submitting 1-star gets flagged suspicious", func(t *testing.T) {
 		verifier.RecordInstallation("user-new-spammer", appID)
 
@@ -102,6 +122,16 @@ func TestTCFUNC013AppealWorkflowDualControl(t *testing.T) {
 		_, err := appealService.DecideAppeal(ctx, appeal.ID, originalReviewer, domain.AppealApproved, "Reconsidering my initial decision")
 		if !errors.Is(err, domain.ErrAppealSameReviewerForbidden) {
 			t.Fatalf("expected ErrAppealSameReviewerForbidden, got %v", err)
+		}
+	})
+
+	t.Run("Sub-test 2b: Stored appeal text is sanitized", func(t *testing.T) {
+		appeal2, err := appealService.SubmitAppeal(ctx, "org-x", "rel-y", `<img src=x onerror=alert(1)> clean reason`, originalReviewer)
+		if err != nil {
+			t.Fatalf("submit failed: %v", err)
+		}
+		if strings.Contains(appeal2.Reason, "onerror") || strings.Contains(appeal2.Reason, "<img") {
+			t.Fatalf("stored XSS survived in appeal reason: %q", appeal2.Reason)
 		}
 	})
 

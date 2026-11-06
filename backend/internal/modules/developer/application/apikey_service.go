@@ -68,6 +68,11 @@ func (s *APIKeyService) ValidateAPIKey(ctx context.Context, raw string) (*domain
 }
 
 // RevokeAPIKey revokes a key.
+// ListAPIKeys returns non-secret key metadata for an org.
+func (s *APIKeyService) ListAPIKeys(ctx context.Context, orgID string) ([]domain.APIKey, error) {
+	return s.repo.ListAPIKeys(ctx, orgID)
+}
+
 func (s *APIKeyService) RevokeAPIKey(ctx context.Context, keyID string) error {
 	return s.repo.RevokeAPIKey(ctx, keyID)
 }

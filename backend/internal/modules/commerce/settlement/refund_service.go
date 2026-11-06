@@ -23,11 +23,14 @@ func NewRefundService(ledger *application.LedgerService, order *application.Orde
 
 // ProcessRefund executes customer refund, revokes entitlement, and journals reverse double-entry
 func (s *RefundService) ProcessRefund(ctx context.Context, order *domain.Order, reason string) error {
-	if order.Status == domain.OrderRefunded {
-		return domain.ErrOrderAlreadyRefunded
+	canonical, err := s.orderService.MarkOrderRefunded(order.ID)
+	if err != nil {
+		return err
 	}
-
 	now := time.Now().UTC()
+	if canonical.RefundedAt != nil {
+		now = *canonical.RefundedAt
+	}
 	order.Status = domain.OrderRefunded
 	order.RefundedAt = &now
 
@@ -48,7 +51,7 @@ func (s *RefundService) ProcessRefund(ctx context.Context, order *domain.Order, 
 		{Account: "ASSET:PG_CLEARING", Type: domain.EntryCredit, Amount: order.GrossAmount},
 	}
 
-	_, err := s.ledgerService.RecordTransaction(ctx, domain.LedgerTransaction{
+	_, err = s.ledgerService.RecordTransaction(ctx, domain.LedgerTransaction{
 		ID:          txID,
 		ReferenceID: order.ID,
 		Description: fmt.Sprintf("Refund for Order %s: %s", order.ID, reason),
