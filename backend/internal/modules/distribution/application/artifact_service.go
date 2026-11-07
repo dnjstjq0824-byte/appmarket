@@ -21,6 +21,8 @@ type DistributionRepository interface {
 	CreateArtifact(ctx context.Context, a *domain.ReleaseArtifact) error
 	GetArtifact(ctx context.Context, id string) (*domain.ReleaseArtifact, error)
 	UpdateArtifactStatus(ctx context.Context, id string, status domain.ArtifactStatus) error
+	ListArtifactsByRelease(ctx context.Context, releaseID string) ([]*domain.ReleaseArtifact, error)
+	SetArtifactPublicCDNKey(ctx context.Context, id, key string) error
 
 	SaveSignature(ctx context.Context, sig *domain.APKSignature) error
 	GetLatestSignatureByDistribution(ctx context.Context, distributionID string) (*domain.APKSignature, error)
@@ -103,6 +105,30 @@ func (r *InMemoryDistributionRepo) UpdateArtifactStatus(ctx context.Context, id 
 		return domain.ErrArtifactNotFound
 	}
 	a.Status = status
+	return nil
+}
+
+func (r *InMemoryDistributionRepo) ListArtifactsByRelease(ctx context.Context, releaseID string) ([]*domain.ReleaseArtifact, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var out []*domain.ReleaseArtifact
+	for _, a := range r.artifacts {
+		if a.ReleaseID == releaseID {
+			c := *a
+			out = append(out, &c)
+		}
+	}
+	return out, nil
+}
+
+func (r *InMemoryDistributionRepo) SetArtifactPublicCDNKey(ctx context.Context, id, key string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	a, ok := r.artifacts[id]
+	if !ok {
+		return domain.ErrArtifactNotFound
+	}
+	a.S3PublicCDNKey = &key
 	return nil
 }
 
@@ -365,6 +391,105 @@ func (s *ArtifactService) TransitionReleaseStatus(ctx context.Context, releaseID
 	return rel, nil
 }
 
+// SubmitReleaseForReview moves a scanned release into the review queue
+// (Play Console "send for review"). Releases resting in SECURITY_SCANNING
+// advance through READY_FOR_SUBMISSION in the same action because the inline
+// verification at upload completion already covers the scan step.
+func (s *ArtifactService) SubmitReleaseForReview(ctx context.Context, releaseID string) (*domain.AppRelease, error) {
+	rel, err := s.repo.GetRelease(ctx, releaseID)
+	if err != nil {
+		return nil, err
+	}
+	switch rel.ReleaseStatus {
+	case domain.ReleaseSecurityScanning:
+		if err := domain.TransitionRelease(rel, domain.ReleaseReadyForSubmission); err != nil {
+			return nil, err
+		}
+		fallthrough
+	case domain.ReleaseReadyForSubmission:
+		if err := domain.TransitionRelease(rel, domain.ReleaseSubmittedForReview); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("%w: submit requires SECURITY_SCANNING or READY_FOR_SUBMISSION, release is %s",
+			domain.ErrInvalidStateTransition, rel.ReleaseStatus)
+	}
+	rel.UpdatedAt = time.Now().UTC()
+	if err := s.repo.UpdateRelease(ctx, rel); err != nil {
+		return nil, err
+	}
+	return rel, nil
+}
+
+// PublishRelease promotes an approved release's artifacts to the public CDN
+// and transitions the release to PUBLISHED_STAGED (percentage 1-99, default
+// 20) or PUBLISHED_FULL. Promotion is fail-closed: any CDN failure aborts
+// before the status changes, and only unscanned-clean artifacts
+// (QUARANTINED or VERIFIED_SAFE) are promotable — infected or rejected
+// artifacts refuse publication.
+func (s *ArtifactService) PublishRelease(ctx context.Context, releaseID string, full bool, percentage int, publisher *CDNPublisher) (*domain.AppRelease, []string, error) {
+	rel, err := s.repo.GetRelease(ctx, releaseID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if rel.ReleaseStatus != domain.ReleaseApprovedPendingPub {
+		return nil, nil, fmt.Errorf("%w: publish requires APPROVED_PENDING_PUBLISH, release is %s",
+			domain.ErrInvalidStateTransition, rel.ReleaseStatus)
+	}
+	if publisher == nil {
+		return nil, nil, fmt.Errorf("publish requires a configured CDN publisher")
+	}
+	target := domain.ReleasePublishedFull
+	pct := 100
+	if !full {
+		if percentage <= 0 {
+			percentage = 20
+		}
+		if percentage < 1 || percentage > 99 {
+			return nil, nil, domain.ErrRolloutPercentageInvalid
+		}
+		target = domain.ReleasePublishedStaged
+		pct = percentage
+	}
+	arts, err := s.repo.ListArtifactsByRelease(ctx, releaseID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(arts) == 0 {
+		return nil, nil, fmt.Errorf("%w: publish requires at least one artifact", domain.ErrInvalidStateTransition)
+	}
+	for _, art := range arts {
+		if art.Status != domain.ArtifactStatusQuarantined && art.Status != domain.ArtifactStatusVerifiedSafe {
+			return nil, nil, fmt.Errorf("%w: artifact %s with status %s refuses publication",
+				domain.ErrInvalidStateTransition, art.ID, art.Status)
+		}
+	}
+	urls := make([]string, 0, len(arts))
+	for _, art := range arts {
+		cdnURL, err := publisher.PromoteToPublicCDN(ctx, art)
+		if err != nil {
+			return nil, nil, fmt.Errorf("CDN promotion failed for artifact %s: %w", art.ID, err)
+		}
+		key := FormatCDNKey(art.PackageName, art.ReleaseID, art.SHA256Hash)
+		if err := s.repo.SetArtifactPublicCDNKey(ctx, art.ID, key); err != nil {
+			return nil, nil, err
+		}
+		if err := s.repo.UpdateArtifactStatus(ctx, art.ID, domain.ArtifactStatusPromotedPublic); err != nil {
+			return nil, nil, err
+		}
+		urls = append(urls, cdnURL)
+	}
+	rel.RolloutPercentage = pct
+	if err := s.repo.UpdateRelease(ctx, rel); err != nil {
+		return nil, nil, err
+	}
+	updated, err := s.TransitionReleaseStatus(ctx, releaseID, target)
+	if err != nil {
+		return nil, nil, err
+	}
+	return updated, urls, nil
+}
+
 // GetUploadSession returns an upload session by id.
 func (s *ArtifactService) GetUploadSession(ctx context.Context, id string) (*domain.UploadSession, error) {
 	return s.repo.GetUploadSession(ctx, id)
@@ -458,4 +583,3 @@ func (s *ArtifactService) UpdateStagedRollout(ctx context.Context, releaseID str
 	}
 	return rel, nil
 }
-

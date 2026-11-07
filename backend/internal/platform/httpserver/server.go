@@ -50,8 +50,8 @@ import (
 	searchApp "github.com/bookingnetwork/appmarket/backend/internal/modules/search/application"
 	searchPres "github.com/bookingnetwork/appmarket/backend/internal/modules/search/presentation"
 
-	analyticsPres "github.com/bookingnetwork/appmarket/backend/internal/modules/analytics/presentation"
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/analytics"
+	analyticsPres "github.com/bookingnetwork/appmarket/backend/internal/modules/analytics/presentation"
 
 	adsApp "github.com/bookingnetwork/appmarket/backend/internal/modules/ads/application"
 
@@ -78,31 +78,41 @@ type Config struct {
 	// Secrets and environment-provided settings. The secrets are
 	// required: New fails closed when any of them is empty, and the payout
 	// encryption key must be exactly 32 bytes.
-	IAMHMACSecret         string
+	IAMHMACSecret           string
 	DistributionTokenSecret string
-	PGWebhookSecret       string
-	PayoutEncryptionKey   string
-	JWTIssuer             string
-	JWTPrivateKey         *rsa.PrivateKey
-	CDNDomain             string
-	PublicBaseURL         string
-	PGProvider            string
-	TossSecretKey         string
-	PortOneAPIKey         string
-	PortOneStoreID        string
-	PGIsLive              bool
-	SentryDSN             string
-	AppEnv                string
-	OAuthRedirectBaseURL  string
-	GoogleClientID        string
-	GoogleClientSecret    string
-	GitHubClientID        string
-	GitHubClientSecret    string
-	AppleClientID         string
-	AppleTeamID           string
-	AppleKeyID            string
-	ApplePrivateKeyPEM    string
-	MediaBucket           string
+	PGWebhookSecret         string
+	PayoutEncryptionKey     string
+	JWTIssuer               string
+	JWTPrivateKey           *rsa.PrivateKey
+	CDNDomain               string
+	PublicBaseURL           string
+	PGProvider              string
+	TossSecretKey           string
+	PortOneAPIKey           string
+	PortOneStoreID          string
+	PGIsLive                bool
+	SentryDSN               string
+	AppEnv                  string
+	OAuthRedirectBaseURL    string
+	GoogleClientID          string
+	GoogleClientSecret      string
+	GitHubClientID          string
+	GitHubClientSecret      string
+	AppleClientID           string
+	AppleTeamID             string
+	AppleKeyID              string
+	ApplePrivateKeyPEM      string
+	MediaBucket             string
+	// Object-storage backend selection. "s3" uses S3ObjectStorage (AWS S3 or
+	// an S3-compatible endpoint); anything else keeps the in-memory store.
+	ObjectStorage     string
+	S3Endpoint        string
+	S3Region          string
+	S3AccessKeyID     string
+	S3SecretAccessKey string
+	S3UsePathStyle    bool
+	QuarantineBucket  string
+	PublicCDNBucket   string
 }
 
 // mediaBucketName resolves the listing-image bucket with a safe default.
@@ -111,6 +121,49 @@ func mediaBucketName(cfg Config) string {
 		return strings.TrimSpace(cfg.MediaBucket)
 	}
 	return "bn-public-media"
+}
+
+// quarantineBucketName resolves the isolated-upload bucket with a safe default.
+func quarantineBucketName(cfg Config) string {
+	if strings.TrimSpace(cfg.QuarantineBucket) != "" {
+		return strings.TrimSpace(cfg.QuarantineBucket)
+	}
+	return "bn-quarantine-bucket"
+}
+
+// publicCDNBucketName resolves the published-artifact bucket with a safe default.
+func publicCDNBucketName(cfg Config) string {
+	if strings.TrimSpace(cfg.PublicCDNBucket) != "" {
+		return strings.TrimSpace(cfg.PublicCDNBucket)
+	}
+	return "bn-public-cdn-bucket"
+}
+
+// objectStoreForConfig builds the shared object store for listing media and
+// quarantined binaries: S3 when ObjectStorage=="s3", in-memory otherwise.
+// S3 misconfiguration fails closed at boot.
+func objectStoreForConfig(ctx context.Context, cfg Config, logger *slog.Logger) (distributionApp.ObjectStorage, error) {
+	if !strings.EqualFold(strings.TrimSpace(cfg.ObjectStorage), "s3") {
+		return distributionApp.NewInMemoryObjectStorage(), nil
+	}
+	endpoint := strings.TrimSpace(cfg.S3Endpoint)
+	store, err := distributionApp.NewS3ObjectStorage(ctx, distributionApp.S3Config{
+		Endpoint:        endpoint,
+		Region:          strings.TrimSpace(cfg.S3Region),
+		AccessKeyID:     cfg.S3AccessKeyID,
+		SecretAccessKey: cfg.S3SecretAccessKey,
+		UsePathStyle:    cfg.S3UsePathStyle,
+		HTTPClient:      cfg.HTTPClient,
+	})
+	if err != nil {
+		return nil, err
+	}
+	target := endpoint
+	if target == "" {
+		target = "aws"
+	}
+	logger.Info("object storage backend selected", "backend", "s3", "target", target)
+	return store, nil
 }
 
 type Server struct {
@@ -280,11 +333,19 @@ func New(cfg Config) (*Server, error) {
 	auctionEngine := adsApp.NewAuctionEngine(50)
 	campaignSvc := adsApp.NewCampaignService(auctionEngine)
 	resolver := consolepkg.NewOrgAppResolver(orgSvc, memberSvc, catalogSvc)
-	uploadSvc := consolepkg.NewUploadService(artifactSvc)
-	rolloutSvc := consolepkg.NewRolloutService(artifactSvc)
+	storeCtx, storeCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer storeCancel()
+	objectStore, err := objectStoreForConfig(storeCtx, cfg, cfg.Logger)
+	if err != nil {
+		return nil, fmt.Errorf("object storage configuration failed: %w", err)
+	}
+	uploadSvc := consolepkg.NewUploadService(artifactSvc).
+		WithQuarantineStorage(objectStore, quarantineBucketName(cfg))
+	rolloutSvc := consolepkg.NewRolloutService(artifactSvc).
+		WithCDNPublisher(distributionApp.NewCDNPublisher(objectStore, quarantineBucketName(cfg), publicCDNBucketName(cfg), cfg.CDNDomain))
 	catalogViewSvc := consolepkg.NewCatalogViewService(resolver, catalogSvc)
 	metadataSvc := consolepkg.NewMetadataService(resolver, catalogSvc).
-		WithMediaStorage(distributionApp.NewInMemoryObjectStorage(), mediaBucketName(cfg))
+		WithMediaStorage(objectStore, mediaBucketName(cfg))
 	adsViewSvc := consolepkg.NewAdsViewService(resolver, campaignSvc)
 	commerceViewSvc := consolepkg.NewCommerceViewService(resolver, promoSvc, pricingSvc, orderSvc)
 	lineageSvc := consolepkg.NewLineageService(resolver, artifactSvc)
@@ -293,12 +354,13 @@ func New(cfg Config) (*Server, error) {
 		Catalog: catalogViewSvc, Metadata: metadataSvc, Ads: adsViewSvc,
 		Commerce: commerceViewSvc, Lineage: lineageSvc,
 	})
-	decisionSvc := consolepkg.NewDecisionService(auditLogger).WithCatalog(catalogSvc)
+	decisionSvc := consolepkg.NewDecisionService(auditLogger).WithCatalog(catalogSvc).WithSearchIndexer(searchSvc).WithReleases(artifactSvc)
 	connectorSvc := consolepkg.NewConnectorService()
 	s.adminHandler = NewAdminHandler(decisionSvc, securitySvc, connectorSvc, payoutSvc, auditRepo, orderSvc, campaignSvc, eventStore, reportSvc, appealSvc, identityResolver)
 	s.adminHandler.AttachAuthorizer(matrixEnforcer)
 	s.adminHandler.AttachVerifications(orgSvc)
 	s.adminHandler.AttachCatalog(catalogSvc)
+	s.adminHandler.AttachJWTManager(jwtManager)
 	s.adminHandler.AttachRefunds(orderSvc, refundSvc)
 	s.distributionHandler.WithKillSwitchValidator(func(ctx context.Context, key string) error {
 		if err := securitySvc.ValidateDownloadRequest(ctx, key); err != nil {
@@ -324,21 +386,21 @@ func commercePGClient(cfg Config, logger *slog.Logger) commerceApp.PGClient {
 	if strings.EqualFold(cfg.PGProvider, "portone") {
 		logger.Info("commerce PG provider selected", "provider", "portone", "live", cfg.PGIsLive)
 		return commerceApp.NewPortOneV2Client(commerceApp.PGConfig{
-			Provider:     commerceApp.PGProviderPortOne,
-			SecretKey:    cfg.PortOneAPIKey,
-			ClientKey:    cfg.PortOneStoreID,
+			Provider:      commerceApp.PGProviderPortOne,
+			SecretKey:     cfg.PortOneAPIKey,
+			ClientKey:     cfg.PortOneStoreID,
 			WebhookSecret: cfg.PGWebhookSecret,
-			IsLive:       cfg.PGIsLive,
-			HTTPClient:   httpClient,
+			IsLive:        cfg.PGIsLive,
+			HTTPClient:    httpClient,
 		})
 	}
 	logger.Info("commerce PG provider selected", "provider", "toss", "live", cfg.PGIsLive)
 	return commerceApp.NewTossPaymentsClient(commerceApp.PGConfig{
-		Provider:     commerceApp.PGProviderToss,
-		SecretKey:    cfg.TossSecretKey,
+		Provider:      commerceApp.PGProviderToss,
+		SecretKey:     cfg.TossSecretKey,
 		WebhookSecret: cfg.PGWebhookSecret,
-		IsLive:       cfg.PGIsLive,
-		HTTPClient:   httpClient,
+		IsLive:        cfg.PGIsLive,
+		HTTPClient:    httpClient,
 	})
 }
 

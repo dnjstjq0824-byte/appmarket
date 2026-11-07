@@ -19,14 +19,14 @@ import (
 // carry module-domain payloads that this package must not name (see
 // architecture_test.go). Nil deps leave the matching routes unregistered.
 type ConsoleDeps struct {
-	Resolver    *console.OrgAppResolver
-	Uploads     *console.UploadService
-	Rollouts    *console.RolloutService
-	Catalog     *console.CatalogViewService
-	Metadata    *console.MetadataService
-	Ads         *console.AdsViewService
-	Commerce    *console.CommerceViewService
-	Lineage     *console.LineageService
+	Resolver *console.OrgAppResolver
+	Uploads  *console.UploadService
+	Rollouts *console.RolloutService
+	Catalog  *console.CatalogViewService
+	Metadata *console.MetadataService
+	Ads      *console.AdsViewService
+	Commerce *console.CommerceViewService
+	Lineage  *console.LineageService
 }
 
 // AttachConsole stores console aggregations for route registration.
@@ -65,6 +65,8 @@ func (h *DeveloperHandler) consoleRoutes(r chi.Router) {
 		r.With(auth).Get("/apps/{appId}/releases/current", h.handleGetCurrentRelease)
 		r.With(auth).Patch("/apps/{appId}/releases/current/rollout", h.handleUpdateRollout)
 		r.With(auth).Patch("/releases/current/rollout", h.handleUpdateRolloutLegacy)
+		r.With(auth).Post("/apps/{appId}/releases/current/submit", h.handleSubmitRelease)
+		r.With(auth).Post("/apps/{appId}/releases/current/publish", h.handlePublishRelease)
 	}
 	if h.console.Lineage != nil {
 		r.With(auth).Get("/apps/{appId}/lineage", h.handleGetLineage)
@@ -350,6 +352,57 @@ func (h *DeveloperHandler) handleGetCurrentRelease(w http.ResponseWriter, r *htt
 	writeJSON(w, http.StatusOK, console.ToReleaseDTO(current))
 }
 
+func (h *DeveloperHandler) handleSubmitRelease(w http.ResponseWriter, r *http.Request) {
+	_, appID, err := h.console.Resolver.ResolveOrgApp(r.Context(), h.callerID(r), r.URL.Query().Get("org"), chi.URLParam(r, "appId"))
+	if err != nil {
+		writeConsoleError(w, r, err)
+		return
+	}
+	rel, err := h.console.Rollouts.SubmitForReview(r.Context(), appID)
+	if err != nil {
+		writeConsoleError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, console.ToReleaseDTO(rel))
+}
+
+type publishReq struct {
+	Mode       string `json:"mode"`
+	Percentage int    `json:"percentage"`
+}
+
+func (h *DeveloperHandler) handlePublishRelease(w http.ResponseWriter, r *http.Request) {
+	var req publishReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errors.WriteProblem(w, http.StatusBadRequest, "ERR_INVALID_BODY", err.Error(), r.URL.Path)
+		return
+	}
+	mode := strings.ToUpper(strings.TrimSpace(req.Mode))
+	if mode == "" {
+		mode = "STAGED"
+	}
+	if mode != "STAGED" && mode != "FULL" {
+		errors.WriteProblem(w, http.StatusBadRequest, "ERR_INVALID_BODY", `mode must be "staged" or "full"`, r.URL.Path)
+		return
+	}
+	_, appID, err := h.console.Resolver.ResolveOrgApp(r.Context(), h.callerID(r), r.URL.Query().Get("org"), chi.URLParam(r, "appId"))
+	if err != nil {
+		writeConsoleError(w, r, err)
+		return
+	}
+	result, err := h.console.Rollouts.Publish(r.Context(), appID, mode == "FULL", req.Percentage)
+	if err != nil {
+		writeConsoleError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"release":           console.ToReleaseDTO(result.Release),
+		"cdnUrls":           result.CDNURLs,
+		"rolloutPercentage": result.Rollout,
+		"full":              result.FullRoll,
+	})
+}
+
 type rolloutReq struct {
 	RolloutPercentage *int   `json:"rolloutPercentage"`
 	Action            string `json:"action"`
@@ -516,11 +569,11 @@ func (h *DeveloperHandler) handleListPromotions(w http.ResponseWriter, r *http.R
 }
 
 type setPricingReq struct {
-	OrgID        string `json:"orgId"`
-	CountryCode  string `json:"countryCode"`
-	Currency     string `json:"currency"`
-	ListPriceMinor int64 `json:"listPriceMinor"`
-	TaxInclusive bool   `json:"taxInclusive"`
+	OrgID          string `json:"orgId"`
+	CountryCode    string `json:"countryCode"`
+	Currency       string `json:"currency"`
+	ListPriceMinor int64  `json:"listPriceMinor"`
+	TaxInclusive   bool   `json:"taxInclusive"`
 }
 
 func (h *DeveloperHandler) handleSetPricing(w http.ResponseWriter, r *http.Request) {
@@ -579,6 +632,12 @@ func writeConsoleError(w http.ResponseWriter, r *http.Request, err error) {
 		status, code = http.StatusConflict, "ERR_UPLOAD_CHECKSUM_MISMATCH"
 	case console.ErrRolloutRejected:
 		status, code = http.StatusConflict, "ERR_ROLLOUT_REJECTED"
+	case console.ErrQuarantineStore:
+		status, code = http.StatusServiceUnavailable, "ERR_QUARANTINE_STORE_FAILED"
+	case console.ErrReleaseNotReady:
+		status, code = http.StatusConflict, "ERR_RELEASE_NOT_READY"
+	case console.ErrReleasePublishFail:
+		status, code = http.StatusServiceUnavailable, "ERR_RELEASE_PUBLISH_FAILED"
 	}
 	errors.WriteProblem(w, status, code, err.Error(), r.URL.Path)
 }

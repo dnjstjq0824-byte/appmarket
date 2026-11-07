@@ -11,6 +11,10 @@ terraform {
       version = "~> 5.40.0"
     }
   }
+  # Remote state. Copy backend.s3.hcl to backend.s3.live.hcl, fill in the
+  # placeholders (never commit real values), then:
+  #   terraform init -backend-config=backend.s3.live.hcl
+  backend "s3" {}
 }
 
 provider "aws" {
@@ -30,7 +34,7 @@ resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
-  tags = { Name = "bn-appmarket-vpc-${var.environment}" }
+  tags                 = { Name = "bn-appmarket-vpc-${var.environment}" }
 }
 
 data "aws_availability_zones" "available" {
@@ -43,7 +47,7 @@ resource "aws_subnet" "public" {
   cidr_block              = cidrsubnet(var.vpc_cidr, 4, count.index)
   availability_zone       = data.aws_availability_zones.available.names[count.index]
   map_public_ip_on_launch = true
-  tags = { Name = "bn-public-subnet-${count.index + 1}" }
+  tags                    = { Name = "bn-public-subnet-${count.index + 1}" }
 }
 
 resource "aws_subnet" "private" {
@@ -51,7 +55,7 @@ resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = cidrsubnet(var.vpc_cidr, 4, count.index + 2)
   availability_zone = data.aws_availability_zones.available.names[count.index]
-  tags = { Name = "bn-private-subnet-${count.index + 1}" }
+  tags              = { Name = "bn-private-subnet-${count.index + 1}" }
 }
 
 resource "aws_subnet" "database" {
@@ -59,7 +63,7 @@ resource "aws_subnet" "database" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = cidrsubnet(var.vpc_cidr, 4, count.index + 4)
   availability_zone = data.aws_availability_zones.available.names[count.index]
-  tags = { Name = "bn-database-subnet-${count.index + 1}" }
+  tags              = { Name = "bn-database-subnet-${count.index + 1}" }
 }
 
 resource "aws_internet_gateway" "gw" {

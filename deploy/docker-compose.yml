@@ -37,6 +37,8 @@ services:
     environment:
       discovery.type: single-node
       plugins.security.disabled: 'true'
+      # Required by the 2.12+ entrypoint even with the security plugin disabled (unused).
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-Br1dge!Quokka-North-2026}
       OPENSEARCH_JAVA_OPTS: '-Xms512m -Xmx512m'
     volumes:
       - searchdata:/usr/share/opensearch/data
@@ -48,39 +50,40 @@ services:
       retries: 18
     networks: [data]
 
-  minio:
-    image: quay.io/minio/minio:RELEASE.2024-10-29T16-01-48Z
-    command: ['server', '/data', '--console-address', ':9001']
+  localstack:
+    image: localstack/localstack:4.0
+    # Buckets/objects do not survive a localstack restart (verified 2026-11-07):
+    # re-provision with `docker compose up s3-buckets` after any restart.
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-bn_minio_admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-bn_minio_password_2026}
+      SERVICES: s3
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: ap-northeast-2
     volumes:
-      - miniodata:/data
+      - s3data:/var/lib/localstack
     ports:
-      - '127.0.0.1:9000:9000'
-      - '127.0.0.1:9001:9001'
+      - '127.0.0.1:4566:4566'
     healthcheck:
-      test: ['CMD-SHELL', 'mc ready local >/dev/null 2>&1 || curl -fsS http://localhost:9000/minio/health/ready >/dev/null']
-      interval: 5s
-      retries: 12
+      test: ['CMD-SHELL', 'curl -fsS http://localhost:4566/_localstack/health >/dev/null']
+      interval: 10s
+      retries: 18
     networks: [data, quarantine]
 
-  minio-buckets:
-    image: minio/mc:RELEASE.2024-10-29T15-34-59Z
+  s3-buckets:
+    image: amazon/aws-cli:2.0.9
     entrypoint: ['/bin/sh', '-ec']
-    command: >-
-      mc alias set local http://minio:9000 "$${MINIO_ROOT_USER:-bn_minio_admin}" "$${MINIO_ROOT_PASSWORD:-bn_minio_password_2026}";
-      mc mb --ignore-existing local/bn-quarantine-bucket;
-      mc mb --ignore-existing local/bn-public-cdn-bucket;
-      mc mb --ignore-existing local/bn-kyb-vault-bucket;
-      mc anonymous set none local/bn-quarantine-bucket;
-      mc anonymous set none local/bn-public-cdn-bucket;
-      mc anonymous set none local/bn-kyb-vault-bucket
+    command:
+      - |
+        for b in bn-quarantine-bucket bn-public-cdn-bucket bn-kyb-vault-bucket bn-public-media; do
+          aws --endpoint-url http://localstack:4566 s3 mb s3://$$b >/dev/null 2>&1 || true;
+        done
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-bn_minio_admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-bn_minio_password_2026}
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: ap-northeast-2
+      AWS_EC2_METADATA_DISABLED: 'true'
     depends_on:
-      minio: {condition: service_healthy}
+      localstack: {condition: service_healthy}
     networks: [data]
 
   migrator:
@@ -104,7 +107,7 @@ services:
       DATABASE_URL: postgres://bn_app:${POSTGRES_PASSWORD:-bn_secure_password_2026}@postgres:5432/bn_appmarket?sslmode=disable
       REDIS_URL: redis://:${REDIS_PASSWORD:-bn_redis_auth_2026}@redis:6379/0
       OPENSEARCH_URL: http://opensearch:9200
-      S3_HEALTH_URL: http://minio:9000/minio/health/ready
+      S3_HEALTH_URL: http://localstack:4566/_localstack/health
       ALLOWED_ORIGIN: ${ALLOWED_ORIGIN:-https://appmarket.dnjstjqppk.workers.dev}
       TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
@@ -113,6 +116,14 @@ services:
       PG_WEBHOOK_SECRET: ${PG_WEBHOOK_SECRET:?PG_WEBHOOK_SECRET is required}
       PAYOUT_ENC_KEY: ${PAYOUT_ENC_KEY:?PAYOUT_ENC_KEY is required}
       MEDIA_BUCKET: ${MEDIA_BUCKET:-bn-public-media}
+      QUARANTINE_BUCKET: ${QUARANTINE_BUCKET:-bn-quarantine-bucket}
+      PUBLIC_CDN_BUCKET: ${PUBLIC_CDN_BUCKET:-bn-public-cdn-bucket}
+      OBJECT_STORAGE: ${OBJECT_STORAGE:-s3}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://localstack:4566}
+      S3_REGION: ${S3_REGION:-ap-northeast-2}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-test}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-test}
+      S3_USE_PATH_STYLE: ${S3_USE_PATH_STYLE:-true}
       JWT_ISSUER: ${JWT_ISSUER:-https://auth.appmarket.local}
       JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}
       CDN_DOMAIN: ${CDN_DOMAIN:-cdn.appmarket.local}
@@ -137,7 +148,7 @@ services:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
       opensearch: {condition: service_healthy}
-      minio: {condition: service_healthy}
+      localstack: {condition: service_healthy}
       migrator: {condition: service_completed_successfully}
     ports:
       - '127.0.0.1:8080:8080'
@@ -188,4 +199,4 @@ volumes:
   pgdata:
   redisdata:
   searchdata:
-  miniodata:
+  s3data:

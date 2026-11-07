@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -25,11 +26,14 @@ type AccessClaims struct {
 }
 
 type JWTManager struct {
-	privateKey *rsa.PrivateKey
-	publicKey  *rsa.PublicKey
-	keyID      string
-	issuer     string
-	ttl        time.Duration
+	mu            sync.RWMutex
+	privateKey    *rsa.PrivateKey
+	publicKey     *rsa.PublicKey
+	keyID         string
+	prevPublicKey *rsa.PublicKey
+	prevKeyID     string
+	issuer        string
+	ttl           time.Duration
 }
 
 // ParseRSAPrivateKeyPEM decodes a PKCS#1 ("RSA PRIVATE KEY") or PKCS#8
@@ -77,6 +81,10 @@ func NewJWTManager(privateKey *rsa.PrivateKey, issuer string) (*JWTManager, erro
 }
 
 func (m *JWTManager) GenerateAccessToken(userID, email string, roles []string, orgRoles map[string]string, mfaVerified bool) (string, error) {
+	m.mu.RLock()
+	privateKey, keyID, issuer, ttl := m.privateKey, m.keyID, m.issuer, m.ttl
+	m.mu.RUnlock()
+
 	now := time.Now().UTC()
 	tokenID := uuid.New().String()
 
@@ -88,18 +96,18 @@ func (m *JWTManager) GenerateAccessToken(userID, email string, roles []string, o
 		MFAVerified: mfaVerified,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        tokenID,
-			Issuer:    m.issuer,
+			Issuer:    issuer,
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),
 			NotBefore: jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(m.ttl)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = m.keyID
+	token.Header["kid"] = keyID
 
-	signed, err := token.SignedString(m.privateKey)
+	signed, err := token.SignedString(privateKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign access token: %w", err)
 	}
@@ -107,15 +115,15 @@ func (m *JWTManager) GenerateAccessToken(userID, email string, roles []string, o
 	return signed, nil
 }
 
-func (m *JWTManager) ValidateAccessToken(tokenStr string) (*AccessClaims, error) {
+func (m *JWTManager) validateWithKey(tokenStr string, key *rsa.PublicKey) (*AccessClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &AccessClaims{}, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		return m.publicKey, nil
+		return key, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("invalid token: %w", err)
+		return nil, err
 	}
 
 	claims, ok := token.Claims.(*AccessClaims)
@@ -126,30 +134,83 @@ func (m *JWTManager) ValidateAccessToken(tokenStr string) (*AccessClaims, error)
 	return claims, nil
 }
 
+func (m *JWTManager) ValidateAccessToken(tokenStr string) (*AccessClaims, error) {
+	m.mu.RLock()
+	current, prev := m.publicKey, m.prevPublicKey
+	m.mu.RUnlock()
+
+	claims, err := m.validateWithKey(tokenStr, current)
+	if err == nil {
+		return claims, nil
+	}
+	if prev != nil {
+		if claims, prevErr := m.validateWithKey(tokenStr, prev); prevErr == nil {
+			return claims, nil
+		}
+	}
+	return nil, fmt.Errorf("invalid token: %w", err)
+}
+
+// RotateKeys activates newPrivateKey for signing and keeps the previous public
+// key for validation grace until the next rotation. A nil key generates a fresh
+// 2048-bit RSA key. Previously issued tokens keep validating; only keys older
+// than one rotation are rejected.
+func (m *JWTManager) RotateKeys(newPrivateKey *rsa.PrivateKey) error {
+	var err error
+	if newPrivateKey == nil {
+		newPrivateKey, err = rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			return fmt.Errorf("failed to generate rotation key: %w", err)
+		}
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.prevPublicKey = m.publicKey
+	m.prevKeyID = m.keyID
+	m.privateKey = newPrivateKey
+	m.publicKey = &newPrivateKey.PublicKey
+	m.keyID = uuid.New().String()
+	return nil
+}
+
 func (m *JWTManager) PublicKey() *rsa.PublicKey {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.publicKey
 }
 
 func (m *JWTManager) KeyID() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.keyID
 }
 
 // GetJWKS returns RFC 7517 compliant JSON Web Key Set representation of public keys.
+// After a rotation it publishes both the current and the previous (grace) key
+// so verifiers can validate tokens issued before the rotation.
 func (m *JWTManager) GetJWKS() map[string]any {
-	nBytes := m.publicKey.N.Bytes()
-	eInt := big.NewInt(int64(m.publicKey.E)).Bytes()
+	m.mu.RLock()
+	current, currentKID, prev, prevKID := m.publicKey, m.keyID, m.prevPublicKey, m.prevKeyID
+	m.mu.RUnlock()
 
+	keys := []map[string]any{rsaPublicJWK(current, currentKID)}
+	if prev != nil {
+		keys = append(keys, rsaPublicJWK(prev, prevKID))
+	}
+	return map[string]any{"keys": keys}
+}
+
+func rsaPublicJWK(key *rsa.PublicKey, kid string) map[string]any {
+	nBytes := key.N.Bytes()
+	eInt := big.NewInt(int64(key.E)).Bytes()
 	return map[string]any{
-		"keys": []map[string]any{
-			{
-				"kty": "RSA",
-				"use": "sig",
-				"alg": "RS256",
-				"kid": m.keyID,
-				"n":   base64.RawURLEncoding.EncodeToString(nBytes),
-				"e":   base64.RawURLEncoding.EncodeToString(eInt),
-			},
-		},
+		"kty": "RSA",
+		"use": "sig",
+		"alg": "RS256",
+		"kid": kid,
+		"n":   base64.RawURLEncoding.EncodeToString(nBytes),
+		"e":   base64.RawURLEncoding.EncodeToString(eInt),
 	}
 }
 
@@ -169,4 +230,3 @@ func (m *JWTManager) GetOpenIDConfiguration(baseURL string) map[string]any {
 		"claims_supported":                      []string{"sub", "iss", "aud", "exp", "iat", "email", "roles"},
 	}
 }
-

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"net/http"
@@ -139,5 +140,49 @@ func TestPortOneV2Client_LiveConfirmVerifiesLedger(t *testing.T) {
 	}
 	if !errors.Is(client.ConfirmPayment(ctx, "pay-failed", "ord-1", 5000), ErrPGPaymentCancelled) {
 		t.Fatalf("expected ErrPGPaymentCancelled for FAILED payment")
+	}
+}
+
+func TestTossPaymentsClient_LiveConfirmPostsToConfirmEndpoint(t *testing.T) {
+	ctx := context.Background()
+	const secret = "live_sk_realistic_secret"
+	var gotAuth, gotMethod, gotPath string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth, gotMethod, gotPath = r.Header.Get("Authorization"), r.Method, r.URL.Path
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := NewTossPaymentsClient(PGConfig{
+		Provider:  PGProviderToss,
+		SecretKey: secret,
+		BaseURL:   server.URL,
+		IsLive:    true,
+	})
+	if err := client.ConfirmPayment(ctx, "pay-live-1", "ord-live-1", 9900); err != nil {
+		t.Fatalf("expected live confirm success: %v", err)
+	}
+	wantAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(secret+":"))
+	if gotAuth != wantAuth {
+		t.Fatalf("expected Authorization %q, got %q", wantAuth, gotAuth)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/payments/confirm" {
+		t.Fatalf("expected POST /payments/confirm, got %s %s", gotMethod, gotPath)
+	}
+
+	reject := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer reject.Close()
+	rejectClient := NewTossPaymentsClient(PGConfig{
+		Provider:  PGProviderToss,
+		SecretKey: secret,
+		BaseURL:   reject.URL,
+		IsLive:    true,
+	})
+	if err := rejectClient.ConfirmPayment(ctx, "pay-live-2", "ord-live-2", 9900); err == nil {
+		t.Fatalf("expected rejection error for 400 confirm response")
+	} else if !strings.Contains(err.Error(), "toss confirm rejected") {
+		t.Fatalf("unexpected error for rejected confirm: %v", err)
 	}
 }

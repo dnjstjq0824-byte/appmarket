@@ -42,3 +42,24 @@ resource "aws_s3_bucket_public_access_block" "public_cdn" {
   restrict_public_buckets = true
 }
 
+resource "aws_s3_bucket" "kyb_vault" {
+  bucket = "bn-kyb-vault-${var.environment}"
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "kyb_vault" {
+  bucket = aws_s3_bucket.kyb_vault.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "aws:kms"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "kyb_vault" {
+  bucket                  = aws_s3_bucket.kyb_vault.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+

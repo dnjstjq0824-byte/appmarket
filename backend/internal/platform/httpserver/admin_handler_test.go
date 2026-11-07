@@ -14,10 +14,10 @@ import (
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/analytics"
 	commerceApp "github.com/bookingnetwork/appmarket/backend/internal/modules/commerce/application"
 	commerceDomain "github.com/bookingnetwork/appmarket/backend/internal/modules/commerce/domain"
+	"github.com/bookingnetwork/appmarket/backend/internal/modules/commerce/settlement"
 	commerceSet "github.com/bookingnetwork/appmarket/backend/internal/modules/commerce/settlement"
 	iamApp "github.com/bookingnetwork/appmarket/backend/internal/modules/iam/application"
 	iamRbac "github.com/bookingnetwork/appmarket/backend/internal/modules/iam/rbac"
-	"github.com/bookingnetwork/appmarket/backend/internal/modules/commerce/settlement"
 	moderationApp "github.com/bookingnetwork/appmarket/backend/internal/modules/moderation/application"
 	securityApp "github.com/bookingnetwork/appmarket/backend/internal/modules/security/application"
 	"github.com/bookingnetwork/appmarket/backend/internal/platform/audit"
@@ -227,7 +227,7 @@ func TestAdminAnalyticsOverviewRevenue(t *testing.T) {
 		t.Fatalf("overview: %d %s", w.Code, w.Body.String())
 	}
 	var body struct {
-		TotalEvents       int `json:"totalEvents"`
+		TotalEvents       int   `json:"totalEvents"`
 		TotalRevenueCents int64 `json:"totalRevenueCents"`
 		RevenueByCountry  []struct {
 			Key     string `json:"key"`
@@ -309,5 +309,80 @@ func TestAdminReportsAndAppeals(t *testing.T) {
 	w = doAdmin(t, router, http.MethodPost, "/appeals/"+appeal.ID+"/decide", map[string]string{"decision": "APPROVED", "notes": "justified"})
 	if w.Code != http.StatusOK {
 		t.Fatalf("decide: %d %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAdminJWTRotationEndpoint(t *testing.T) {
+	handler, _, _, _, _, _ := adminTestRouter(t)
+	jwtMgr, err := iamApp.NewJWTManager(nil, "https://auth.appmarket.local")
+	if err != nil {
+		t.Fatalf("jwt manager: %v", err)
+	}
+	handler.AttachAuthorizer(iamRbac.NewMatrixEnforcer(jwtMgr))
+	handler.AttachJWTManager(jwtMgr)
+	router := handler.Routes()
+
+	superToken, _ := jwtMgr.GenerateAccessToken("super-1", "super@test.local", []string{"ADMIN_SUPER"}, nil, true)
+	firstKID := jwtMgr.KeyID()
+	doRotate := func(token string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/security/jwt/rotate", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w
+	}
+
+	w := doRotate(superToken)
+	if w.Code != http.StatusOK {
+		t.Fatalf("rotate: %d %s", w.Code, w.Body.String())
+	}
+	var receipt map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &receipt); err != nil {
+		t.Fatalf("receipt decode: %v", err)
+	}
+	if receipt["kid"] == firstKID || receipt["previous_kid"] != firstKID {
+		t.Fatalf("unexpected rotation receipt: %v", receipt)
+	}
+	if len(jwtMgr.GetJWKS()["keys"].([]map[string]any)) != 2 {
+		t.Fatalf("expected dual-key JWKS after rotation")
+	}
+
+	// Pre-rotation token keeps passing the full middleware chain (grace).
+	req := httptest.NewRequest(http.MethodGet, "/security/kill-switches", nil)
+	req.Header.Set("Authorization", "Bearer "+superToken)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("grace token rejected: %d %s", w.Code, w.Body.String())
+	}
+
+	// Permission without MFA must not rotate.
+	secToken, _ := jwtMgr.GenerateAccessToken("sec-1", "sec@test.local", []string{"ADMIN_SECURITY"}, nil, false)
+	if w := doRotate(secToken); w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 without MFA, got %d", w.Code)
+	}
+	// Ordinary users must not rotate.
+	userToken, _ := jwtMgr.GenerateAccessToken("user-1", "user@test.local", []string{"USER"}, nil, true)
+	if w := doRotate(userToken); w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for USER, got %d", w.Code)
+	}
+}
+
+func TestAdminJWTRotationUnavailableWithoutManager(t *testing.T) {
+	handler, _, _, _, _, _ := adminTestRouter(t)
+	jwtMgr, err := iamApp.NewJWTManager(nil, "https://auth.appmarket.local")
+	if err != nil {
+		t.Fatalf("jwt manager: %v", err)
+	}
+	handler.AttachAuthorizer(iamRbac.NewMatrixEnforcer(jwtMgr))
+	router := handler.Routes()
+
+	superToken, _ := jwtMgr.GenerateAccessToken("super-1", "super@test.local", []string{"ADMIN_SUPER"}, nil, true)
+	req := httptest.NewRequest(http.MethodPost, "/security/jwt/rotate", nil)
+	req.Header.Set("Authorization", "Bearer "+superToken)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 without attached manager, got %d", w.Code)
 	}
 }

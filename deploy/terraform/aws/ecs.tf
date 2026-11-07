@@ -37,6 +37,45 @@ resource "aws_iam_role" "ecs_task_role" {
   })
 }
 
+# Least-privilege S3 data access for the API task role (SDK default chain).
+resource "aws_iam_policy" "ecs_task_s3" {
+  name = "bn-ecs-task-s3-${var.environment}"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["s3:ListBucket"]
+        Resource = [
+          aws_s3_bucket.quarantine.arn,
+          aws_s3_bucket.public_cdn.arn,
+          aws_s3_bucket.kyb_vault.arn,
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:GetObjectTagging",
+          "s3:PutObjectTagging",
+        ]
+        Resource = [
+          "${aws_s3_bucket.quarantine.arn}/*",
+          "${aws_s3_bucket.public_cdn.arn}/*",
+          "${aws_s3_bucket.kyb_vault.arn}/*",
+        ]
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_s3" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.ecs_task_s3.arn
+}
+
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/ecs/bn-appmarket-api-${var.environment}"
   retention_in_days = 30
@@ -65,11 +104,20 @@ resource "aws_ecs_task_definition" "api" {
       { name = "ALLOWED_ORIGIN", value = "https://appmarket.dnjstjqppk.workers.dev" },
       { name = "TRUSTED_PROXY_CIDRS", value = "10.0.0.0/16" },
       { name = "OPENSEARCH_URL", value = "https://search.appmarket.local:9200" },
-      { name = "S3_HEALTH_URL", value = "https://s3.ap-northeast-2.amazonaws.com" }
+      { name = "S3_HEALTH_URL", value = "https://s3.ap-northeast-2.amazonaws.com" },
+      { name = "OBJECT_STORAGE", value = "s3" },
+      { name = "S3_REGION", value = var.aws_region },
+      { name = "S3_USE_PATH_STYLE", value = "false" },
+      { name = "MEDIA_BUCKET", value = aws_s3_bucket.public_cdn.bucket },
+      { name = "QUARANTINE_BUCKET", value = aws_s3_bucket.quarantine.bucket }
     ]
     secrets = [
       { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.db_url.arn },
-      { name = "REDIS_URL", valueFrom = aws_secretsmanager_secret.redis_url.arn }
+      { name = "REDIS_URL", valueFrom = aws_secretsmanager_secret.redis_url.arn },
+      { name = "IAM_HMAC_SECRET", valueFrom = aws_secretsmanager_secret.iam_hmac_secret.arn },
+      { name = "DISTRIBUTION_TOKEN_SECRET", valueFrom = aws_secretsmanager_secret.distribution_token_secret.arn },
+      { name = "PG_WEBHOOK_SECRET", valueFrom = aws_secretsmanager_secret.pg_webhook_secret.arn },
+      { name = "PAYOUT_ENC_KEY", valueFrom = aws_secretsmanager_secret.payout_enc_key.arn }
     ]
     logConfiguration = {
       logDriver = "awslogs"

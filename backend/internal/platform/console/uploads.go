@@ -22,20 +22,32 @@ import (
 const maxUploadBytes = 2 * 1024 * 1024 * 1024
 
 var (
-	ErrUploadInvalid   = errors.New("ERR_UPLOAD_INVALID")
-	ErrUploadNotFound  = errors.New("ERR_UPLOAD_NOT_FOUND")
-	ErrUploadState     = errors.New("ERR_UPLOAD_STATE")
-	ErrUploadExpired   = errors.New("ERR_UPLOAD_EXPIRED")
+	ErrUploadInvalid    = errors.New("ERR_UPLOAD_INVALID")
+	ErrUploadNotFound   = errors.New("ERR_UPLOAD_NOT_FOUND")
+	ErrUploadState      = errors.New("ERR_UPLOAD_STATE")
+	ErrUploadExpired    = errors.New("ERR_UPLOAD_EXPIRED")
 	ErrChecksumMismatch = errors.New("ERR_UPLOAD_CHECKSUM_MISMATCH")
+	ErrQuarantineStore  = errors.New("ERR_QUARANTINE_STORE_FAILED")
 )
 
 // UploadService drives quarantine upload sessions plus APK/AAB completion.
 type UploadService struct {
-	artifacts *distApp.ArtifactService
+	artifacts        *distApp.ArtifactService
+	quarantineStore  distApp.ObjectStorage
+	quarantineBucket string
 }
 
 func NewUploadService(artifacts *distApp.ArtifactService) *UploadService {
 	return &UploadService{artifacts: artifacts}
+}
+
+// WithQuarantineStorage enables persistence of uploaded binaries at the
+// session's S3QuarantineKey before scanning. Without it completion keeps the
+// previous scan-only behavior (unit-test mode).
+func (s *UploadService) WithQuarantineStorage(store distApp.ObjectStorage, bucket string) *UploadService {
+	s.quarantineStore = store
+	s.quarantineBucket = bucket
+	return s
 }
 
 // InitUpload validates the declared binary and opens a quarantine session.
@@ -82,10 +94,10 @@ type BinaryDetails struct {
 // CompleteResult is the completion receipt. Details is nil when the caller
 // completed metadata-only (no binary bytes supplied).
 type CompleteResult struct {
-	UploadID string                        `json:"uploadId"`
-	Status   string                        `json:"status"`
-	Release  *distDomain.AppRelease        `json:"release,omitempty"`
-	Details  *BinaryDetails                `json:"details,omitempty"`
+	UploadID string                 `json:"uploadId"`
+	Status   string                 `json:"status"`
+	Release  *distDomain.AppRelease `json:"release,omitempty"`
+	Details  *BinaryDetails         `json:"details,omitempty"`
 }
 
 // CompleteUpload finishes a session. When apkBytes are supplied the real
@@ -115,6 +127,24 @@ func (s *UploadService) CompleteUpload(ctx context.Context, uploadID, sha256Hex 
 	sum := sha256.Sum256(apkBytes)
 	if !strings.EqualFold(hex.EncodeToString(sum[:]), session.ExpectedSHA256) {
 		return nil, ErrChecksumMismatch
+	}
+	// Quarantine-first: land the verified bytes in isolated storage before any
+	// parsing, so even rejected binaries stay available for forensics and the
+	// promotion path always finds the object behind S3QuarantineKey.
+	if s.quarantineStore != nil && s.quarantineBucket != "" {
+		if err := s.quarantineStore.PutObject(ctx, s.quarantineBucket, &distApp.StorageObject{
+			Key:         session.S3QuarantineKey,
+			Content:     apkBytes,
+			SHA256:      session.ExpectedSHA256,
+			ContentType: quarantineContentType(session.ArtifactType),
+			Tags: map[string]string{
+				"status":     "quarantined",
+				"session_id": session.ID,
+				"app_id":     session.AppID,
+			},
+		}); err != nil {
+			return nil, ErrQuarantineStore
+		}
 	}
 	now := time.Now().UTC()
 	release := &distDomain.AppRelease{
@@ -162,4 +192,11 @@ func (s *UploadService) CompleteUpload(ctx context.Context, uploadID, sha256Hex 
 	}
 	_ = artifact
 	return &CompleteResult{UploadID: uploadID, Status: "COMPLETED", Release: updated, Details: details}, nil
+}
+
+func quarantineContentType(artifactType distDomain.ArtifactType) string {
+	if artifactType == distDomain.ArtifactTypeAAB {
+		return "application/octet-stream"
+	}
+	return "application/vnd.android.package-archive"
 }

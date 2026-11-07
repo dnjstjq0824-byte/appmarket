@@ -12,14 +12,15 @@ import (
 
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/ads/application"
 	adsDomain "github.com/bookingnetwork/appmarket/backend/internal/modules/ads/domain"
+	"github.com/bookingnetwork/appmarket/backend/internal/modules/analytics"
 	catalogApp "github.com/bookingnetwork/appmarket/backend/internal/modules/catalog/application"
 	catalogDomain "github.com/bookingnetwork/appmarket/backend/internal/modules/catalog/domain"
-	"github.com/bookingnetwork/appmarket/backend/internal/modules/analytics"
 	commerceApp "github.com/bookingnetwork/appmarket/backend/internal/modules/commerce/application"
 	commerceDomain "github.com/bookingnetwork/appmarket/backend/internal/modules/commerce/domain"
 	"github.com/bookingnetwork/appmarket/backend/internal/modules/commerce/settlement"
 	developerApp "github.com/bookingnetwork/appmarket/backend/internal/modules/developer/application"
 	developerDomain "github.com/bookingnetwork/appmarket/backend/internal/modules/developer/domain"
+	iamApp "github.com/bookingnetwork/appmarket/backend/internal/modules/iam/application"
 	iamRbac "github.com/bookingnetwork/appmarket/backend/internal/modules/iam/rbac"
 	moderationApp "github.com/bookingnetwork/appmarket/backend/internal/modules/moderation/application"
 	moderationDomain "github.com/bookingnetwork/appmarket/backend/internal/modules/moderation/domain"
@@ -34,21 +35,22 @@ import (
 // because it composes services from many modules, which modules themselves
 // must never import (see architecture_test.go).
 type AdminHandler struct {
-	decisions   *console.DecisionService
-	security    *securityApp.SecurityService
-	connectors  *console.ConnectorService
-	payouts     *settlement.MonthlyPayoutService
-	auditRepo   audit.AuditRepository
-	orders      *commerceApp.OrderService
-	refunds     *settlement.RefundService
-	campaigns   *application.CampaignService
-	eventStore  analytics.EventStore
-	reports     *moderationApp.ReportService
-	appeals     *moderationApp.AppealService
-	identity    func(*http.Request) (string, error)
-	authorizer  *iamRbac.MatrixEnforcer
-	verifier    *developerApp.OrgService
-	catalog     *catalogApp.CatalogService
+	decisions  *console.DecisionService
+	security   *securityApp.SecurityService
+	connectors *console.ConnectorService
+	payouts    *settlement.MonthlyPayoutService
+	auditRepo  audit.AuditRepository
+	orders     *commerceApp.OrderService
+	refunds    *settlement.RefundService
+	campaigns  *application.CampaignService
+	eventStore analytics.EventStore
+	reports    *moderationApp.ReportService
+	appeals    *moderationApp.AppealService
+	identity   func(*http.Request) (string, error)
+	authorizer *iamRbac.MatrixEnforcer
+	verifier   *developerApp.OrgService
+	catalog    *catalogApp.CatalogService
+	jwt        *iamApp.JWTManager
 }
 
 // AttachAuthorizer enables RBAC permission enforcement on admin routes.
@@ -72,6 +74,12 @@ func (h *AdminHandler) AttachCatalog(catalog *catalogApp.CatalogService) {
 func (h *AdminHandler) AttachRefunds(orders *commerceApp.OrderService, refunds *settlement.RefundService) {
 	h.orders = orders
 	h.refunds = refunds
+}
+
+// AttachJWTManager enables signing-key rotation. Without it the rotate
+// endpoint reports unavailable instead of failing on a nil manager.
+func (h *AdminHandler) AttachJWTManager(jwt *iamApp.JWTManager) {
+	h.jwt = jwt
 }
 
 func NewAdminHandler(
@@ -121,6 +129,7 @@ func (h *AdminHandler) Routes() chi.Router {
 	r.With(guard("admin:security:read")).Get("/security/kill-switch/{packageName}", h.handleKillSwitchStatus)
 	r.With(guard("admin:security:read")).Get("/security/kill-switches", h.handleListKillSwitches)
 	r.With(guard("admin:killswitch:execute"), mfa).Delete("/security/kill-switch/{packageName}", h.handleKillSwitchLift)
+	r.With(guard("admin:security:decide"), mfa).Post("/security/jwt/rotate", h.handleJWTRotate)
 	r.With(guard("admin:security:read")).Get("/security/scans", h.handleListScans)
 	r.With(guard("admin:search:manage")).Get("/connectors", h.handleListConnectors)
 	r.With(guard("admin:connector:manage")).Post("/connectors", h.handleRegisterConnector)
@@ -318,6 +327,28 @@ func (h *AdminHandler) handleKillSwitchLift(w http.ResponseWriter, r *http.Reque
 	}
 	state, _ := h.security.KillSwitchState(r.Context(), pkg)
 	writeAdminJSON(w, http.StatusOK, state)
+}
+
+// handleJWTRotate activates a fresh signing key. Tokens minted before the
+// rotation keep validating through the one-generation grace window, and JWKS
+// publishes both keys until the next rotation.
+func (h *AdminHandler) handleJWTRotate(w http.ResponseWriter, r *http.Request) {
+	if h.jwt == nil {
+		problem.WriteProblem(w, http.StatusServiceUnavailable, "ERR_JWT_ROTATION_UNAVAILABLE", "key rotation is not wired", r.URL.Path)
+		return
+	}
+	previousKID := h.jwt.KeyID()
+	if err := h.jwt.RotateKeys(nil); err != nil {
+		problem.WriteProblem(w, http.StatusInternalServerError, "ERR_JWT_ROTATION_FAILED", err.Error(), r.URL.Path)
+		return
+	}
+	writeAdminJSON(w, http.StatusOK, map[string]any{
+		"kid":          h.jwt.KeyID(),
+		"previous_kid": previousKID,
+		"rotated_by":   h.callerID(r),
+		"rotated_at":   time.Now().UTC(),
+		"grace":        "tokens signed by the previous key remain valid until the next rotation",
+	})
 }
 
 func (h *AdminHandler) handleListKillSwitches(w http.ResponseWriter, r *http.Request) {

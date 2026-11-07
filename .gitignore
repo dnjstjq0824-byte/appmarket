@@ -13,3 +13,6 @@ backend/bin/
 .gradle/
 **/build/
 .output/
+.wrangler/
+.dev.vars
+*.live.hcl
