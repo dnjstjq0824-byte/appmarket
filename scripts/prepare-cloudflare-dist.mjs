@@ -1,4 +1,4 @@
-import { existsSync, cpSync, rmSync, mkdirSync, writeFileSync, copyFileSync } from 'node:fs';
+import { existsSync, cpSync, rmSync, mkdirSync, writeFileSync, copyFileSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 
 const rootDir = process.cwd();
@@ -112,8 +112,28 @@ const headersContent = `/*
 `;
 writeFileSync(join(distDir, '_headers'), headersContent, 'utf-8');
 
-// Note: Do NOT generate catch-all wildcard rules in _redirects (e.g. /* /index.html 200).
-// Cloudflare's edge validator rejects them with code 100324 (infinite loop detection).
-// Native SPA fallback is handled via not_found_handling = "single-page-application" and 200.html.
+// Note: Do NOT use _redirects for SPA fallbacks here. Catch-all rules are
+// rejected by the edge validator (100324), and scoped splats are not applied
+// under existing directories (/developer/*, /admin/* still fall through).
+// Fallbacks live in worker/index.ts instead: exact asset first, then the
+// owning app's shell on miss (200.html for the store, per-console index).
+// Requires not_found_handling = "none". Verified by
+// scripts/smoke/routes-e2e.ps1 against `wrangler dev`.
+//
+// The generated 200.html embeds the prerender payload of the internal /200
+// route, which pins client boot to a nonexistent route ("Page not found:
+// /200"). The store fetches all data client-side, so strip the payload tag;
+// the shell then boots fresh and routes by URL. Config (window.__NUXT__)
+// and head payload stay untouched.
+const shellPath = join(distDir, '200.html');
+const shellHtml = readFileSync(shellPath, 'utf-8');
+const strippedShell = shellHtml.replace(
+  /<script[^>]*id="__NUXT_DATA__"[^>]*>[\s\S]*?<\/script>/,
+  ''
+);
+if (strippedShell === shellHtml) {
+  throw new Error('[cloudflare-dist] __NUXT_DATA__ tag not found in 200.html');
+}
+writeFileSync(shellPath, strippedShell, 'utf-8');
 
 console.log('[cloudflare-dist] Unified Cloudflare distribution bundle ready in ./dist');

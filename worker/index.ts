@@ -1986,12 +1986,44 @@ export default {
       return handleApiRequest(request, env)
     }
 
-    // 3. Fallback to Cloudflare Static Assets
+    // 3. Static assets with per-app SPA fallback shells.
+    // The assets layer cannot serve the right entry for deep links on its
+    // own: native SPA fallback returns the prerendered store home (whose
+    // embedded payload boots the home route), and _redirects rules are not
+    // applied under existing directories (/developer/*, /admin/*).
+    // Strategy: serve the exact asset first; only on miss, serve the owning
+    // app's shell (extensionless GET navigations only, so real files and
+    // prerendered pages always win). Requires not_found_handling = "none".
     try {
-      return await env.ASSETS.fetch(request)
+      const direct = await env.ASSETS.fetch(request)
+      if (direct.status !== 404) {
+        return direct
+      }
     } catch {
-      return new Response('Asset not found', { status: 404 })
+      // Fall through to shell resolution below.
     }
+    if (request.method === 'GET' && !/\.[a-z0-9]+$/i.test(pathname)) {
+      // Canonical subrequest forms: the assets layer 307-normalizes explicit
+      // ".html" file URLs (e.g. /200.html -> /200), which would surface as a
+      // client redirect and lose the deep-link path. Extensionless /200 and
+      // trailing-slash directory indexes serve content directly with 200.
+      const shell =
+        pathname === '/developer' || pathname.startsWith('/developer/')
+          ? '/developer/'
+          : pathname === '/admin' || pathname.startsWith('/admin/')
+            ? '/admin/'
+            : '/200'
+      try {
+        const rewritten = new Request(new URL(shell, url.origin), request)
+        const shelled = await env.ASSETS.fetch(rewritten)
+        if (shelled.status !== 404) {
+          return shelled
+        }
+      } catch {
+        // Fall through to the 404 below.
+      }
+    }
+    return new Response('Asset not found', { status: 404 })
   },
 }
 
