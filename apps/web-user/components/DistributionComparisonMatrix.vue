@@ -50,7 +50,7 @@
                 @click="onDirectDownload(source)"
                 class="btn btn-install btn-sm"
               >
-                📥 Direct Download
+                Direct Download
               </button>
               <a 
                 v-else 
@@ -112,20 +112,25 @@ function onDirectDownload(source: DistributionSource) {
 
 <style scoped>
 .distribution-comparison-matrix {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  background: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
   padding: 24px;
   margin: 24px 0;
 }
 .matrix-header {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--bn-border-subtle);
 }
 .matrix-header h3 {
+  font-family: var(--bn-font-display);
+  font-size: 15px;
+  font-weight: 800;
   margin: 0 0 4px 0;
 }
 .subtitle {
-  color: #64748b;
+  color: var(--bn-text-secondary);
   font-size: 13px;
   margin: 0;
 }
@@ -140,17 +145,24 @@ function onDirectDownload(source: DistributionSource) {
 .comparison-table th {
   text-align: left;
   padding: 10px 12px;
-  border-bottom: 2px solid #e2e8f0;
-  color: #475569;
-  font-weight: 600;
+  border-bottom: 2px solid var(--bn-ink);
+  color: var(--bn-text-muted);
+  font-family: var(--bn-font-mono);
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
 }
 .comparison-table td {
   padding: 14px 12px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--bn-border-subtle);
   vertical-align: middle;
 }
-.comparison-table tr.is-primary {
-  background: #f8fafc;
+.comparison-table tr:last-child td {
+  border-bottom: none;
+}
+.comparison-table tr.is-primary td:first-child {
+  box-shadow: inset 3px 0 0 var(--bn-seal);
 }
 .store-info {
   display: flex;
@@ -158,24 +170,30 @@ function onDirectDownload(source: DistributionSource) {
   gap: 8px;
 }
 .rights-pill {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: var(--bn-radius-sm);
+  border: 1px solid var(--bn-border-strong);
+  color: var(--bn-text-secondary);
+  white-space: nowrap;
 }
-.tier-level_1_direct_hosted { background: #dcfce7; color: #166534; }
-.tier-level_2_licensed_federated_binary { background: #eff6ff; color: #1d4ed8; }
-.tier-level_3_search_and_info_only { background: #fef3c7; color: #92400e; }
-.tier-level_4_official_link_only { background: #f3e8ff; color: #6b21a8; }
+.tier-level_1_direct_hosted { border-color: var(--bn-trust-verified); color: var(--bn-trust-verified); }
+.tier-level_2_licensed_federated_binary { border-color: var(--bn-border-strong); color: var(--bn-text-primary); }
+.tier-level_3_search_and_info_only { border-color: var(--bn-warning-amber); color: var(--bn-warning-amber); }
+.tier-level_4_official_link_only { border-color: var(--bn-border-strong); color: var(--bn-text-muted); }
 .sync-text {
-  font-size: 11px;
-  color: #94a3b8;
-  margin-top: 2px;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  color: var(--bn-text-muted);
+  margin-top: 4px;
 }
 .cert-box {
-  background: #f1f5f9;
+  background: var(--bn-bg-well);
+  border: 1px solid var(--bn-border-subtle);
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--bn-radius-sm);
   display: inline-block;
   font-size: 11px;
 }
@@ -183,37 +201,47 @@ function onDirectDownload(source: DistributionSource) {
   font-weight: 600;
 }
 .badge {
-  padding: 2px 6px;
-  border-radius: 10px;
+  font-family: var(--bn-font-mono);
   font-size: 10px;
-  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  border-radius: var(--bn-radius-sm);
+  border: 1px solid var(--bn-seal);
+  color: var(--bn-seal);
+  white-space: nowrap;
 }
-.badge-primary { background: #dbeafe; color: #1e40af; }
+.badge-primary { border-color: var(--bn-seal); color: var(--bn-seal); }
 .btn {
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 7px 14px;
+  border-radius: var(--bn-radius-sm);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
 }
 .btn-install {
-  background: #2563eb;
-  color: white;
+  background: var(--bn-action-bg);
+  color: var(--bn-action-text);
   border: none;
 }
+.btn-install:hover {
+  background: var(--bn-action-bg-hover);
+}
 .btn-outlink {
-  background: #f1f5f9;
-  color: #1e293b;
-  border: 1px solid #cbd5e1;
+  background: transparent;
+  color: var(--bn-text-primary);
+  border: 1px solid var(--bn-border-strong);
 }
 .btn-outlink:hover {
-  background: #e2e8f0;
+  border-color: var(--bn-text-primary);
 }
-.text-success { color: #16a34a; }
-.font-mono { font-family: monospace; }
+.text-success { color: var(--bn-trust-verified); }
+.text-sm { font-size: 12px; }
+.font-bold { font-weight: 700; }
+.font-mono { font-family: var(--bn-font-mono); }
 </style>
 

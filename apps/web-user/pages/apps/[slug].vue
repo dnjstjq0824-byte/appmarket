@@ -195,7 +195,7 @@ const isDirectMode = computed(() => {
 
 const iconUrl = computed(() => {
   const ch = ((detail.value?.localization?.title || '?').trim().slice(0, 1) || '?').toUpperCase()
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#334155"/><text x="32" y="42" font-size="28" font-weight="700" text-anchor="middle" fill="white" font-family="sans-serif">${ch}</text></svg>`
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 64 64"><rect width="64" height="64" rx="10" fill="#1a1611"/><rect x="0" y="56" width="64" height="8" fill="#b3261e"/><text x="32" y="40" font-size="26" font-weight="800" text-anchor="middle" fill="#faf9f6" font-family="sans-serif">${ch}</text></svg>`
   return 'data:image/svg+xml,' + encodeURIComponent(svg)
 })
 
@@ -320,24 +320,33 @@ onMounted(() => {
 .bn-container {
   max-width: 1000px;
   margin: 0 auto;
-  padding: 32px 16px;
+  padding: 32px 24px 60px;
+}
+.bn-loading {
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
 }
 .bn-detail-header {
   display: flex;
   align-items: center;
   gap: 24px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid var(--bn-ink);
   flex-wrap: wrap;
 }
 .bn-detail-icon {
   width: 96px;
   height: 96px;
-  border-radius: 20px;
-  background-color: var(--bn-bg-elevated);
+  border-radius: var(--bn-radius-lg);
+  border: 1px solid var(--bn-border-subtle);
+  background-color: var(--bn-bg-well);
   object-fit: cover;
 }
 .bn-detail-main {
   flex: 1;
+  min-width: 240px;
 }
 .bn-title-flex {
   display: flex;
@@ -345,14 +354,19 @@ onMounted(() => {
   gap: 12px;
 }
 .bn-title-flex h1 {
-  font-size: 26px;
+  font-family: var(--bn-font-display);
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -0.025em;
   margin: 0;
   color: var(--bn-text-primary);
+  line-height: 1.15;
 }
 .bn-detail-dev {
   margin: 6px 0 10px 0;
-  color: var(--bn-text-muted);
-  font-size: 15px;
+  color: var(--bn-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
 }
 .bn-detail-tags {
   display: flex;
@@ -360,12 +374,12 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 .bn-badge {
-  background-color: var(--bn-bg-elevated);
+  background-color: transparent;
   border: 1px solid var(--bn-border-subtle);
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 13px;
-  font-weight: 500;
+  border-radius: var(--bn-radius-sm);
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--bn-text-secondary);
 }
 .bn-action-area {
@@ -375,55 +389,84 @@ onMounted(() => {
 .bn-distributions-section, .bn-desc-section {
   margin-top: 36px;
 }
+.bn-distributions-section h2, .bn-desc-section h2 {
+  font-family: var(--bn-font-display);
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--bn-border-subtle);
+}
 .bn-table-wrapper {
   overflow-x: auto;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
 }
 .bn-dist-table {
   width: 100%;
   border-collapse: collapse;
   background-color: var(--bn-bg-surface);
-  border: 1px solid var(--bn-border-subtle);
-  border-radius: 8px;
 }
 .bn-dist-table th, .bn-dist-table td {
   padding: 12px 16px;
   text-align: left;
   border-bottom: 1px solid var(--bn-border-subtle);
   font-size: 14px;
+  vertical-align: middle;
+}
+.bn-dist-table tr:last-child td {
+  border-bottom: none;
 }
 .bn-dist-table th {
-  background-color: var(--bn-bg-elevated);
-  font-weight: 600;
-  color: var(--bn-text-secondary);
-}
-.bn-rights-tag {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background-color: var(--bn-bg-elevated);
+  background-color: var(--bn-bg-well);
+  font-family: var(--bn-font-mono);
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 0.1em;
   color: var(--bn-text-muted);
 }
-.bn-desc-content {
-  line-height: 1.6;
+.bn-rights-tag {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  border-radius: var(--bn-radius-sm);
+  border: 1px solid var(--bn-border-strong);
   color: var(--bn-text-secondary);
-  font-size: 15px;
+  white-space: nowrap;
+}
+.bn-desc-content {
+  line-height: 1.7;
+  color: var(--bn-text-secondary);
+  font-size: 14px;
+  white-space: pre-line;
+}
+.bn-desc-content a {
+  color: var(--bn-text-primary);
+  font-weight: 600;
 }
 .bn-mono-sm {
-  font-family: monospace;
+  font-family: var(--bn-font-mono);
   font-size: 11px;
-  color: var(--bn-text-muted, #64748B);
+  color: var(--bn-text-muted);
   margin-top: 4px;
 }
 .bn-empty {
-  padding: 16px;
-  color: var(--bn-text-muted, #64748B);
+  padding: 20px;
+  color: var(--bn-text-muted);
   font-size: 14px;
+  border: 1px dashed var(--bn-border-strong);
+  border-radius: var(--bn-radius-md);
+  text-align: center;
 }
 .bn-error {
-  padding: 32px 16px;
+  padding: 48px 16px;
   text-align: center;
-  color: #b91c1c;
+  color: var(--bn-danger-red);
+}
+.bn-error a {
+  color: var(--bn-text-primary);
+  font-weight: 700;
 }
 .bn-media-row {
   display: flex;
@@ -433,8 +476,8 @@ onMounted(() => {
 }
 .bn-shot {
   max-height: 320px;
-  border-radius: 8px;
-  border: 1px solid var(--bn-border-subtle, #E2E8F0);
+  border-radius: var(--bn-radius-md);
+  border: 1px solid var(--bn-border-subtle);
 }
 .bn-review-list {
   display: flex;
@@ -443,65 +486,98 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 .bn-review-card {
-  border: 1px solid var(--bn-border-subtle, #E2E8F0);
-  border-radius: 8px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
   padding: 16px;
 }
 .bn-review-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   margin-bottom: 8px;
 }
+.bn-review-head strong {
+  font-size: 14px;
+}
 .bn-stars {
-  color: #d97706;
-  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 1px;
 }
 .bn-review-form {
-  border: 1px solid var(--bn-border-subtle, #E2E8F0);
-  border-radius: 8px;
-  padding: 16px;
+  border: 1px solid var(--bn-border-subtle);
+  border-top: 3px solid var(--bn-ink);
+  border-radius: var(--bn-radius-md);
+  padding: 20px;
+}
+.bn-review-form h3 {
+  font-family: var(--bn-font-display);
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0 0 14px;
 }
 .bn-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 12px;
+  gap: 6px;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
+  margin-bottom: 14px;
 }
 .bn-field input, .bn-field textarea {
-  padding: 8px 10px;
-  border: 1px solid var(--bn-border-subtle, #E2E8F0);
-  border-radius: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  background: var(--bn-bg-surface);
+  color: var(--bn-text-primary);
+  font-family: var(--bn-font-sans);
   font-size: 14px;
-  font-weight: 400;
+}
+.bn-field input:focus, .bn-field textarea:focus {
+  outline: none;
+  border-color: var(--bn-ink);
 }
 .bn-btn-primary {
-  background: #059669;
-  color: #fff;
+  background: var(--bn-action-bg);
+  color: var(--bn-action-text);
   border: none;
-  border-radius: 6px;
-  padding: 10px 18px;
+  border-radius: var(--bn-radius-sm);
+  padding: 11px 24px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
+.bn-btn-primary:hover:not(:disabled) {
+  background: var(--bn-action-bg-hover);
+}
 .bn-btn-primary:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 .bn-form-error {
-  color: #b91c1c;
+  color: var(--bn-danger-red);
   font-size: 13px;
   margin-bottom: 12px;
 }
 .bn-form-done {
-  color: #059669;
+  color: var(--bn-trust-verified);
   font-size: 13px;
   margin-bottom: 12px;
 }
 .bn-whatsnew {
   margin-top: 16px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  background: var(--bn-bg-well);
+  padding: 14px 16px;
+}
+.bn-whatsnew h3 {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+.bn-whatsnew .bn-desc-content {
+  margin: 0;
 }
 </style>

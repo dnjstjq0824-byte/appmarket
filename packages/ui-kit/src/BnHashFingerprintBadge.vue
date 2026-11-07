@@ -43,21 +43,20 @@ async function copyToClipboard() {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: var(--bn-bg-elevated, #F1F5F9);
-  border: 1px solid var(--bn-border-subtle, #E2E8F0);
-  border-radius: 6px;
+  background-color: var(--bn-bg-well);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
   padding: 3px 8px;
   cursor: pointer;
   user-select: none;
-  transition: background-color 0.15s ease;
 }
 .bn-hash-badge:hover {
-  background-color: var(--bn-border-subtle, #E2E8F0);
+  border-color: var(--bn-border-strong);
 }
 .bn-hash-text {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--bn-font-mono);
   font-size: 12px;
-  color: var(--bn-text-secondary, #334155);
+  color: var(--bn-text-secondary);
 }
 .bn-copy-icon {
   width: 13px;

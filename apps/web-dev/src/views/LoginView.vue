@@ -2,7 +2,7 @@
   <div class="login-view">
     <div class="login-card">
       <div class="login-brand">
-        <span class="logo-icon">▲</span>
+        <span class="seal-mark" aria-hidden="true">BN</span>
         <span class="logo-text">BookingNetwork</span>
         <span class="badge-dev">DEVELOPER CONSOLE</span>
       </div>
@@ -145,7 +145,7 @@ async function submitMfa() {
 
 <style scoped>
 .login-view {
-  min-height: calc(100vh - 64px);
+  min-height: 60vh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -153,43 +153,58 @@ async function submitMfa() {
 }
 .login-card {
   width: 100%;
-  max-width: 420px;
-  background: #0f172a;
-  border: 1px solid #1e293b;
-  border-radius: 12px;
+  max-width: 430px;
+  background: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-top: 3px solid var(--bn-seal);
+  border-radius: var(--bn-radius-md);
   padding: 32px;
 }
 .login-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 22px;
 }
-.logo-icon {
-  color: #10b981;
-  font-size: 18px;
+.seal-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background-color: var(--bn-seal);
+  color: #fff;
+  font-family: var(--bn-font-display);
+  font-weight: 900;
+  font-size: 11px;
+  border-radius: var(--bn-radius-sm);
 }
 .logo-text {
-  font-weight: 700;
-  color: #f8fafc;
+  font-family: var(--bn-font-display);
+  font-weight: 800;
+  font-size: 15px;
 }
 .badge-dev {
-  background: #0284c7;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 4px;
+  font-family: var(--bn-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--bn-text-muted);
+  border: 1px solid var(--bn-border-subtle);
+  padding: 3px 7px;
+  border-radius: var(--bn-radius-sm);
 }
 .login-card h2 {
   margin: 0 0 4px;
-  color: #f8fafc;
-  font-size: 20px;
+  font-family: var(--bn-font-display);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
 }
 .login-desc {
-  color: #94a3b8;
+  color: var(--bn-text-secondary);
   font-size: 13px;
-  margin: 0 0 20px;
+  line-height: 1.6;
+  margin: 0 0 18px;
 }
 .oauth-row {
   display: flex;
@@ -200,81 +215,93 @@ async function submitMfa() {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #94a3b8;
-  margin-bottom: 12px;
+  gap: 6px;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
+  margin-bottom: 14px;
 }
 .field input {
-  padding: 10px 12px;
-  border: 1px solid #334155;
-  border-radius: 6px;
+  padding: 11px 12px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  font-family: var(--bn-font-sans);
   font-size: 14px;
-  background: #0b1120;
-  color: #f8fafc;
+  background: var(--bn-bg-surface);
+  color: var(--bn-text-primary);
+}
+.field input:focus {
+  outline: none;
+  border-color: var(--bn-ink);
 }
 .login-error {
   padding: 10px 12px;
-  background: rgba(220, 38, 38, 0.12);
-  border: 1px solid #7f1d1d;
-  color: #fca5a5;
-  border-radius: 6px;
+  background: var(--bn-danger-wash);
+  border: 1px solid var(--bn-danger-red);
+  color: var(--bn-danger-red);
+  border-radius: var(--bn-radius-sm);
   font-size: 13px;
   margin-bottom: 12px;
 }
 .btn {
   width: 100%;
-  padding: 10px 16px;
-  border-radius: 6px;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  border-radius: var(--bn-radius-sm);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  border: none;
   text-align: center;
   text-decoration: none;
   display: block;
 }
 .btn-primary {
-  background: #0284c7;
-  color: white;
+  background: var(--bn-action-bg);
+  color: var(--bn-action-text);
+  border: none;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--bn-action-bg-hover);
 }
 .btn-primary:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 .btn-oauth {
-  background: #1e293b;
-  color: #e2e8f0;
-  border: 1px solid #334155;
+  background: transparent;
+  color: var(--bn-text-primary);
+  border: 1px solid var(--bn-border-subtle);
   font-size: 13px;
 }
+.btn-oauth:hover {
+  border-color: var(--bn-border-strong);
+}
 .enroll-box {
-  background: #0b1120;
-  border: 1px solid #f59e0b;
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 12px;
+  background: var(--bn-warning-wash);
+  border: 1px solid var(--bn-warning-amber);
+  border-radius: var(--bn-radius-md);
+  padding: 14px;
+  margin-bottom: 14px;
 }
 .enroll-secret {
-  font-family: monospace;
+  font-family: var(--bn-font-mono);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 1px;
-  color: #fbbf24;
+  color: var(--bn-text-primary);
   word-break: break-all;
 }
 .enroll-uri {
-  font-family: monospace;
+  font-family: var(--bn-font-mono);
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--bn-text-muted);
   word-break: break-all;
   margin-top: 6px;
 }
 .enroll-codes {
-  font-family: monospace;
+  font-family: var(--bn-font-mono);
   font-size: 12px;
-  color: #e2e8f0;
   word-break: break-all;
   line-height: 1.7;
 }
@@ -282,10 +309,15 @@ async function submitMfa() {
   margin-top: 16px;
   background: none;
   border: none;
-  color: #38bdf8;
+  color: var(--bn-text-primary);
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
   width: 100%;
   text-align: center;
+}
+.link-btn:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 </style>

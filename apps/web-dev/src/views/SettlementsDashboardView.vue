@@ -293,16 +293,25 @@ function downloadCsvLedger() {
 
 <style scoped>
 .settlements-dashboard-view {
-  padding: 24px;
-  max-width: 1000px;
+  max-width: 1020px;
   margin: 0 auto;
 }
 .view-header {
   margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--bn-ink);
+}
+.view-header h2 {
+  font-family: var(--bn-font-display);
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
 }
 .subtitle {
-  color: #64748b;
-  font-size: 14px;
+  color: var(--bn-text-secondary);
+  font-size: 13px;
+  margin: 0;
 }
 .org-row {
   display: flex;
@@ -310,79 +319,106 @@ function downloadCsvLedger() {
   gap: 10px;
   margin-bottom: 16px;
   font-size: 13px;
+  color: var(--bn-text-secondary);
+}
+.org-row label {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
 }
 .org-row select {
   padding: 8px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
   font-size: 13px;
-  background: white;
+  font-family: var(--bn-font-sans);
+  background: var(--bn-bg-surface);
+  color: var(--bn-text-primary);
 }
 .loading-row {
-  padding: 16px;
-  color: #64748b;
+  padding: 24px;
+  color: var(--bn-text-muted);
   font-size: 14px;
+  text-align: center;
 }
 .load-error {
   padding: 12px 16px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
-  border-radius: 6px;
+  background: var(--bn-danger-wash);
+  border: 1px solid var(--bn-danger-red);
+  color: var(--bn-danger-red);
+  border-radius: var(--bn-radius-sm);
   font-size: 13px;
   margin-bottom: 16px;
 }
 .empty-row {
-  padding: 16px;
-  color: #64748b;
+  padding: 20px 16px;
+  color: var(--bn-text-muted);
   font-size: 14px;
   text-align: center;
 }
 .balance-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 24px;
 }
 .balance-card {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 20px;
+  background: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  padding: 18px;
 }
 .balance-card label {
-  font-size: 12px;
-  color: #64748b;
-  text-transform: uppercase;
-  font-weight: 600;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
   display: block;
   margin-bottom: 8px;
 }
 .balance-amount {
-  font-size: 22px;
-  font-weight: 700;
-  color: #0f172a;
+  font-family: var(--bn-font-display);
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
   margin-bottom: 6px;
+}
+.balance-amount.font-mono {
+  font-family: var(--bn-font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 .subtext {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--bn-text-muted);
 }
-.text-danger { color: #dc2626; }
-.text-success { color: #16a34a; }
-.text-amber { color: #d97706; }
+.font-bold { font-weight: 700; }
+.font-mono { font-family: var(--bn-font-mono); }
+.text-danger { color: var(--bn-danger-red); }
+.text-success { color: var(--bn-trust-verified); }
+.text-amber { color: var(--bn-warning-amber); }
 .ledger-card, .payout-account-card {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  background: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
   padding: 24px;
   margin-bottom: 24px;
+}
+.ledger-card h3, .payout-account-card h3 {
+  font-family: var(--bn-font-display);
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
 }
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 .statement-table {
   width: 100%;
@@ -392,35 +428,49 @@ function downloadCsvLedger() {
 .statement-table th {
   text-align: left;
   padding: 10px 12px;
-  border-bottom: 2px solid #e2e8f0;
-  color: #475569;
-  font-weight: 600;
+  border-bottom: 2px solid var(--bn-ink);
+  font-family: var(--bn-font-mono);
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
+  white-space: nowrap;
 }
 .statement-table td {
   padding: 12px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--bn-border-subtle);
+  vertical-align: middle;
+}
+.statement-table tr:last-child td {
+  border-bottom: none;
 }
 .badge {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: var(--bn-radius-sm);
+  border: 1px solid var(--bn-border-strong);
+  color: var(--bn-text-secondary);
+  white-space: nowrap;
 }
-.badge-success { background: #dcfce7; color: #166534; }
-.badge-pending { background: #fef3c7; color: #92400e; }
+.badge-success { border-color: var(--bn-trust-verified); color: var(--bn-trust-verified); }
+.badge-pending { border-color: var(--bn-warning-amber); color: var(--bn-warning-amber); }
 .bank-details {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-top: 16px;
-  background: #f8fafc;
+  background: var(--bn-bg-well);
+  border: 1px solid var(--bn-border-subtle);
   padding: 16px;
-  border-radius: 6px;
+  border-radius: var(--bn-radius-sm);
 }
 .bank-item label {
-  font-size: 11px;
-  color: #64748b;
-  text-transform: uppercase;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
   display: block;
   margin-bottom: 4px;
 }
@@ -429,10 +479,11 @@ function downloadCsvLedger() {
 }
 .payout-form {
   margin-top: 20px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--bn-border-subtle);
   padding-top: 16px;
 }
 .payout-form h4 {
+  font-size: 14px;
   margin: 0 0 12px;
 }
 .form-grid {
@@ -444,36 +495,70 @@ function downloadCsvLedger() {
 .form-grid label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
+  gap: 6px;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--bn-text-muted);
 }
 .form-grid input {
-  padding: 8px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  padding: 9px 12px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  background: var(--bn-bg-surface);
+  color: var(--bn-text-primary);
+  font-family: var(--bn-font-sans);
   font-size: 13px;
-  font-weight: 400;
+}
+.form-grid input:focus {
+  outline: none;
+  border-color: var(--bn-ink);
 }
 .form-note {
   font-size: 12px;
-  color: #64748b;
-  margin: 0 0 12px;
+  color: var(--bn-text-muted);
+  margin: 0 0 14px;
+}
+.form-note code {
+  font-family: var(--bn-font-mono);
 }
 .btn {
-  padding: 6px 14px;
-  border-radius: 6px;
+  padding: 9px 18px;
+  border-radius: var(--bn-radius-sm);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
+}
+.btn-primary {
+  background: var(--bn-action-bg);
+  color: var(--bn-action-text);
   border: none;
 }
-.btn-primary { background: #2563eb; color: white; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-secondary { background: #f1f5f9; color: #334155; }
-.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-outline { border: 1px solid #cbd5e1; background: transparent; color: #334155; }
-.btn-sm { font-size: 12px; padding: 4px 10px; }
-.btn-xs { font-size: 11px; padding: 2px 8px; }
+.btn-primary:hover:not(:disabled) {
+  background: var(--bn-action-bg-hover);
+}
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--bn-border-subtle);
+  color: var(--bn-text-secondary);
+}
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--bn-border-strong);
+  color: var(--bn-text-primary);
+}
+.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-outline { border: 1px solid var(--bn-border-strong); background: transparent; color: var(--bn-text-primary); }
+.btn-sm { font-size: 12px; padding: 6px 14px; }
+.btn-xs { font-size: 11px; padding: 3px 10px; }
+@media (max-width: 900px) {
+  .balance-grid, .bank-details {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .balance-grid, .bank-details, .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

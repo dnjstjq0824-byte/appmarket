@@ -1,107 +1,106 @@
 <template>
-  <div class="play-home-root">
-    <!-- Sub-Navbar Category Pills (Google Play Style Horizontal Scroll) -->
-    <div class="category-pills-bar">
-      <div class="category-pills-container">
+  <div class="ledger-home">
+    <!-- Category ledger tabs -->
+    <div class="ledger-tabs-bar">
+      <div class="ledger-tabs">
         <button
-          v-for="cat in categoryList"
+          v-for="(cat, i) in categoryList"
           :key="cat.id"
-          class="cat-chip-btn"
+          class="ledger-tab"
           :class="{ active: selectedCategory === cat.id }"
           @click="selectCategory(cat.id)"
         >
-          <span class="chip-icon">{{ cat.icon }}</span>
-          <span class="chip-label">{{ cat.name }}</span>
+          <span class="tab-index">{{ String(i + 1).padStart(2, '0') }}</span>
+          <span class="tab-label">{{ cat.name }}</span>
         </button>
       </div>
     </div>
 
-    <!-- 1. Featured Billboard Carousel (Google Play / App Store Hero) -->
-    <section class="billboard-section">
-      <div class="billboard-container">
-        <div class="billboard-slider">
+    <!-- 01. Featured board -->
+    <section class="board-section">
+      <div class="board-frame">
+        <div class="board-slider">
           <div
             v-for="(banner, idx) in billboardBanners"
             :key="banner.id"
-            class="billboard-card"
-            :class="{ active: currentBannerIdx === idx }"
-            :style="{ background: banner.gradient }"
+            class="board-card"
+            :class="[`tone-${banner.tone}`, { active: currentBannerIdx === idx }]"
             @click="openAppDetail(banner.app)"
           >
-            <div class="billboard-content">
-              <div class="billboard-tags">
-                <span class="tag-spotlight">{{ banner.tag }}</span>
-                <span class="tag-verified">🛡️ TreeScan™ 보안 검역 및 APK V3 서명 검증</span>
+            <div class="board-content">
+              <div class="board-kicker">
+                <span class="kicker-no">FEATURED {{ String(idx + 1).padStart(2, '0') }} / {{ String(billboardBanners.length).padStart(2, '0') }}</span>
+                <span class="kicker-tag">{{ banner.tag }}</span>
               </div>
-              <h2 class="billboard-title">{{ banner.title }}</h2>
-              <p class="billboard-subtitle">{{ banner.subtitle }}</p>
-              <div class="billboard-meta-row">
-                <div class="billboard-app-icon"><img :src="banner.app.icon_url" :alt="banner.app.title" width="56" height="56" /></div>
-                <div class="billboard-app-info">
+              <h2 class="board-title">{{ banner.title }}</h2>
+              <p class="board-subtitle">{{ banner.subtitle }}</p>
+              <div class="board-app-row">
+                <div class="board-app-icon"><img :src="banner.app.icon_url" :alt="banner.app.title" width="56" height="56" /></div>
+                <div class="board-app-info">
                   <div class="app-info-title">{{ banner.app.title }}</div>
-                  <div class="app-info-dev">{{ banner.app.developer_name }} • ★ {{ banner.app.rating.toFixed(1) }}</div>
+                  <div class="app-info-dev">{{ banner.app.developer_name }} · ★ {{ banner.app.rating.toFixed(1) }}</div>
                 </div>
+                <span class="seal-stamp">V3 VERIFIED</span>
               </div>
-              <div class="billboard-actions">
-                <button class="play-btn-install" @click.stop="triggerQuickInstall(banner.app)">
-                  <span>⬇️</span> 설치
+              <div class="board-actions">
+                <button class="btn-ink" @click.stop="triggerQuickInstall(banner.app)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M4 21h16" /></svg>
+                  설치
                 </button>
-                <button class="play-btn-info" @click.stop="openAppDetail(banner.app)">
-                  자세히 알아보기
+                <button class="btn-text" @click.stop="openAppDetail(banner.app)">
+                  자세히 보기 →
                 </button>
               </div>
             </div>
 
-            <!-- Visual Art Showcase (Right Side) -->
-            <div class="billboard-graphic">
-              <div class="device-mockup-frame">
-                <div class="mockup-header-notch"></div>
-                <div class="mockup-screen"><img :src="banner.app.icon_url" :alt="banner.app.title" /></div>
-              </div>
+            <div class="board-figure" aria-hidden="true">
+              <div class="figure-rating">{{ banner.app.rating.toFixed(1) }}</div>
+              <div class="figure-caption">STORE RATING / {{ banner.app.category_name }}</div>
+              <div class="figure-index">{{ String(idx + 1).padStart(2, '0') }}</div>
             </div>
           </div>
         </div>
 
-        <!-- Carousel Dots -->
-        <div class="carousel-dots-row">
+        <div class="board-pager">
           <button
             v-for="(_, idx) in billboardBanners"
             :key="idx"
-            class="dot-btn"
+            class="pager-btn"
             :class="{ active: currentBannerIdx === idx }"
             @click="currentBannerIdx = idx"
             :title="`배너 ${idx + 1}`"
-          ></button>
+          >{{ String(idx + 1).padStart(2, '0') }}</button>
         </div>
       </div>
     </section>
 
-    <!-- 2. Security & Trust Guarantee Strip -->
-    <section class="play-protect-strip">
-      <div class="protect-inner">
-        <div class="protect-icon-shield">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2L4 5V11.5C4 16.5 7.5 21 12 22C16.5 21 20 16.5 20 11.5V5L12 2Z" fill="#01875F" fill-opacity="0.2" stroke="#01875F" stroke-width="2"/>
-            <path d="M9 12L11 14L15 9" stroke="#01875F" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- 02. Verification strip -->
+    <section id="section-protect" class="verify-strip">
+      <div class="verify-inner">
+        <div class="verify-seal" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L4 5V11.5C4 16.5 7.5 21 12 22C16.5 21 20 16.5 20 11.5V5L12 2Z" />
+            <path d="M9 12L11 14L15 9" />
           </svg>
         </div>
-        <div class="protect-text">
-          <strong>TreeScan™ 다계층 보안 검역 및 V3 서명 연속성 검증</strong>
-          <p>모든 패키지는 비공식 스크래핑을 배제하고, 개발자 직접 서명 V3 검증 및 VirusTotal v3 멀티 엔진 검역 파이프라인을 통과합니다.</p>
+        <div class="verify-text">
+          <strong>TreeScan 다계층 보안 검역 · V3 서명 연속성 검증</strong>
+          <p>모든 패키지는 개발자 직접 서명 V3 검증과 멀티 엔진 검역 파이프라인을 통과합니다. 비공식 스크래핑 경로는 취급하지 않습니다.</p>
         </div>
-        <div class="protect-stat">
+        <div class="verify-stat">
           <span class="stat-number">100%</span>
-          <span class="stat-label">무결성 검증됨</span>
+          <span class="stat-label">INTEGRITY VERIFIED</span>
         </div>
       </div>
     </section>
 
-    <!-- 3. Recommended For You (Google Play Horizontal Row) -->
-    <section id="section-apps" class="play-collection-section">
-      <div class="section-title-row">
-        <div class="title-left">
-          <h2 class="collection-title">추천 앱 및 게임</h2>
-          <span class="collection-sub">에디터가 엄선한 안전한 독립 배포 인기 애플리케이션</span>
+    <!-- 03. Recommended -->
+    <section id="section-apps" class="ledger-section">
+      <div class="section-head">
+        <div class="section-head-left">
+          <span class="section-no">01</span>
+          <h2 class="section-title">추천 앱 및 게임</h2>
+          <span class="section-sub">에디터가 엄선한 독립 배포 인기 애플리케이션</span>
         </div>
         <button class="see-all-btn" @click="selectedCategory = 'all'">전체보기 →</button>
       </div>
@@ -109,14 +108,14 @@
       <div v-if="isLoading" class="home-status">카탈로그를 불러오는 중…</div>
       <div v-if="loadError" class="home-status home-error">{{ loadError }}</div>
       <div v-if="!isLoading && !loadError && filteredRecommendedApps.length === 0" class="home-status">표시할 앱이 없습니다.</div>
-      <div v-if="!isLoading && !loadError" class="horizontal-scroll-container">
+      <div v-if="!isLoading && !loadError" class="app-rail">
         <div
           v-for="app in filteredRecommendedApps"
           :key="app.id"
-          class="play-app-card"
+          class="app-card"
           @click="openAppDetail(app)"
         >
-          <div class="card-icon-squircle"><img :src="app.icon_url" :alt="app.title" width="56" height="56" /></div>
+          <div class="card-icon-tile"><img :src="app.icon_url" :alt="app.title" width="56" height="56" /></div>
           <div class="card-content">
             <h3 class="card-title">{{ app.title }}</h3>
             <div class="card-dev">{{ app.developer_name }}</div>
@@ -137,128 +136,154 @@
       </div>
     </section>
 
-    <!-- 4. Top Charts Section (Google Play Famous 3x3 Ranking Grid) -->
-    <section id="section-charts" class="play-collection-section charts-section">
-      <div class="section-title-row">
-        <div class="title-left">
-          <h2 class="collection-title">인기 차트</h2>
-          <span class="collection-sub">실시간 다운로드 및 사용자 호평 랭킹 순위</span>
-        </div>
-        <!-- Chart Filter Tabs -->
-        <div class="chart-tab-group">
-          <button
-            class="chart-tab-btn"
-            :class="{ active: chartTab === 'free' }"
-            @click="switchChart('free')"
-          >
-            인기 무료
-          </button>
-          <button
-            class="chart-tab-btn"
-            :class="{ active: chartTab === 'grossing' }"
-            @click="switchChart('grossing')"
-          >
-            최고 매출
-          </button>
-          <button
-            class="chart-tab-btn"
-            :class="{ active: chartTab === 'trending' }"
-            @click="switchChart('trending')"
-          >
-            급상승
-          </button>
+    <!-- 04. Games strip -->
+    <section v-if="gamesApps.length > 0" id="section-games" class="ledger-section">
+      <div class="section-head">
+        <div class="section-head-left">
+          <span class="section-no">02</span>
+          <h2 class="section-title">이번 주 게임</h2>
+          <span class="section-sub">카탈로그에서 바로 고른 게임 행</span>
         </div>
       </div>
-
-      <div v-if="chartLoading" class="home-status">차트를 불러오는 중…</div>
-      <div v-if="!chartLoading && chartFilteredApps.length === 0" class="home-status">차트 데이터가 없습니다.</div>
-      <div v-if="!chartLoading" class="top-charts-grid">
+      <div class="games-strip">
         <div
-          v-for="(app, idx) in chartFilteredApps"
+          v-for="(app, idx) in gamesApps"
           :key="app.id"
-          class="chart-row-item"
+          class="game-row"
           @click="openAppDetail(app)"
         >
-          <div class="chart-rank-number" :class="`rank-${idx + 1}`">{{ idx + 1 }}</div>
-          <div class="chart-icon-squircle"><img :src="app.icon_url" :alt="app.title" width="56" height="56" /></div>
-          <div class="chart-info">
-            <h4 class="chart-app-title">{{ app.title }}</h4>
-            <div class="chart-app-dev">{{ app.developer_name }}</div>
-            <div class="chart-app-meta">
-              <span>★ {{ app.rating.toFixed(1) }}</span>
-              <span>• {{ app.category_name }}</span>
-              <span>• {{ fmtCount(app.install_count) }}</span>
-            </div>
+          <span class="game-rank">{{ String(idx + 1).padStart(2, '0') }}</span>
+          <div class="game-icon-tile"><img :src="app.icon_url" :alt="app.title" width="56" height="56" /></div>
+          <div class="game-info">
+            <strong>{{ app.title }}</strong>
+            <span>{{ app.developer_name }} · ★ {{ app.rating.toFixed(1) }}</span>
           </div>
-          <div class="chart-btn-box">
-            <button class="pill-install-btn" @click.stop="triggerQuickInstall(app)">
-              {{ app.is_free ? '설치' : '유료' }}
+          <button class="mini-install-btn" @click.stop="triggerQuickInstall(app)">설치</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 05. Charts -->
+    <section id="section-charts" class="ledger-section">
+      <div class="charts-panel">
+        <div class="section-head">
+          <div class="section-head-left">
+            <span class="section-no">03</span>
+            <h2 class="section-title">인기 차트</h2>
+            <span class="section-sub">실시간 다운로드 및 사용자 호평 랭킹</span>
+          </div>
+          <div class="chart-tab-group">
+            <button
+              class="chart-tab-btn"
+              :class="{ active: chartTab === 'free' }"
+              @click="switchChart('free')"
+            >
+              인기 무료
             </button>
+            <button
+              class="chart-tab-btn"
+              :class="{ active: chartTab === 'grossing' }"
+              @click="switchChart('grossing')"
+            >
+              최고 매출
+            </button>
+            <button
+              class="chart-tab-btn"
+              :class="{ active: chartTab === 'trending' }"
+              @click="switchChart('trending')"
+            >
+              급상승
+            </button>
+          </div>
+        </div>
+
+        <div v-if="chartLoading" class="home-status">차트를 불러오는 중…</div>
+        <div v-if="!chartLoading && chartFilteredApps.length === 0" class="home-status">차트 데이터가 없습니다.</div>
+        <div v-if="!chartLoading" class="charts-grid">
+          <div
+            v-for="(app, idx) in chartFilteredApps"
+            :key="app.id"
+            class="chart-row-item"
+            @click="openAppDetail(app)"
+          >
+            <div class="chart-rank-number">{{ idx + 1 }}</div>
+            <div class="chart-icon-tile"><img :src="app.icon_url" :alt="app.title" width="56" height="56" /></div>
+            <div class="chart-info">
+              <h4 class="chart-app-title">{{ app.title }}</h4>
+              <div class="chart-app-dev">{{ app.developer_name }}</div>
+              <div class="chart-app-meta">
+                <span>★ {{ app.rating.toFixed(1) }}</span>
+                <span>· {{ app.category_name }}</span>
+                <span>· {{ fmtCount(app.install_count) }}</span>
+              </div>
+            </div>
+            <div class="chart-btn-box">
+              <button class="pill-install-btn" @click.stop="triggerQuickInstall(app)">
+                {{ app.is_free ? '설치' : '유료' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 5. Apple App Store Style "Today" Editorial Story Card -->
-    <section id="section-editors" class="today-editorial-section">
-      <div class="editorial-card">
-        <div class="editorial-overlay">
-          <span class="editorial-eyebrow">투데이 에디터 심층 리뷰</span>
-          <h3 class="editorial-headline">왜 단일 빅테크 마켓에 의존하지 않아야 하는가?</h3>
-          <p class="editorial-summary">
-            EU 디지털 시장법(DMA) 제6조 제4항은 개발사에게 대체 앱 스토어 및 독립적인 사이드로딩 배포 권리를 보장합니다.
-            BookingNetwork App Market은 독자적인 V3 서명 연속성 검증을 통해 구글 플레이 정책 변경에도
-            중단 없는 투명한 애플리케이션 라이프사이클을 제공합니다.
-          </p>
-          <div class="editorial-app-strip" v-if="allApps[0]" @click="openAppDetail(allApps[0])">
-            <div class="editorial-app-icon"><img :src="allApps[0].icon_url" :alt="allApps[0].title" width="56" height="56" /></div>
-            <div class="editorial-app-text">
-              <strong>{{ allApps[0].title }}</strong>
-              <span>{{ allApps[0].developer_name }} • 별점 {{ allApps[0].rating.toFixed(1) }}</span>
-            </div>
-            <button class="play-btn-install mini" @click.stop="triggerQuickInstall(allApps[0])">설치</button>
+    <!-- 06. Editorial -->
+    <section id="section-editors" class="editorial-section">
+      <div class="editorial-panel">
+        <span class="editorial-kicker">EDITORIAL · TODAY</span>
+        <h3 class="editorial-headline">왜 단일 빅테크 마켓에 의존하지 않아야 하는가?</h3>
+        <p class="editorial-summary">
+          EU 디지털 시장법(DMA) 제6조 제4항은 개발사에게 대체 앱 스토어 및 독립적인 사이드로딩 배포 권리를 보장합니다.
+          BookingNetwork App Market은 독자적인 V3 서명 연속성 검증을 통해 정책 변경에도
+          중단 없는 투명한 애플리케이션 라이프사이클을 제공합니다.
+        </p>
+        <div class="editorial-app-strip" v-if="allApps[0]" @click="openAppDetail(allApps[0])">
+          <div class="editorial-app-icon"><img :src="allApps[0].icon_url" :alt="allApps[0].title" width="56" height="56" /></div>
+          <div class="editorial-app-text">
+            <strong>{{ allApps[0].title }}</strong>
+            <span>{{ allApps[0].developer_name }} · 별점 {{ allApps[0].rating.toFixed(1) }}</span>
           </div>
+          <button class="editorial-install-btn" @click.stop="triggerQuickInstall(allApps[0])">설치</button>
         </div>
       </div>
     </section>
 
-    <!-- 6. Google Play / App Store Style Full-Screen App Detail Modal Sheet -->
-    <div v-if="selectedApp" class="app-modal-backdrop" @click="closeAppDetail">
-      <div class="app-modal-sheet" @click.stop>
-        <!-- Modal Top Bar -->
-        <div class="modal-top-bar">
-          <button class="modal-close-btn" @click="closeAppDetail" title="닫기">
-            ✕
-          </button>
-          <div class="modal-top-actions">
-            <button class="modal-icon-btn" title="공유하기" @click="copyShareLink">
-              🔗
+    <!-- 07. App detail sheet -->
+    <div v-if="selectedApp" class="sheet-backdrop" @click="closeAppDetail">
+      <div class="sheet" @click.stop>
+        <div class="sheet-topbar">
+          <span class="sheet-kicker">APP RECORD · {{ selectedApp.package_name }}</span>
+          <div class="sheet-top-actions">
+            <button class="sheet-icon-btn" title="공유하기" @click="copyShareLink" aria-label="공유하기">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" /><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" /></svg>
             </button>
-            <button class="modal-icon-btn" title="위시리스트 저장" @click="toggleWishlist">
-              {{ isWishlisted ? '❤️' : '🤍' }}
+            <button class="sheet-icon-btn" title="위시리스트 저장" @click="toggleWishlist" aria-label="위시리스트">
+              <svg width="15" height="15" viewBox="0 0 24 24" :fill="isWishlisted ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" /></svg>
+            </button>
+            <button class="sheet-icon-btn" @click="closeAppDetail" title="닫기" aria-label="닫기">
+              <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M1 1l10 10M11 1L1 11" /></svg>
             </button>
           </div>
         </div>
 
         <div v-if="modalLoading" class="home-status">앱 정보를 불러오는 중…</div>
-        <div v-else class="modal-scroll-body">
-          <!-- App Profile Header -->
+        <div v-else class="sheet-body">
           <div class="detail-header-row">
             <div class="detail-icon-large"><img :src="selectedApp.icon_url" :alt="selectedApp.title" width="72" height="72" /></div>
             <div class="detail-title-col">
               <h1 class="detail-app-name">{{ selectedApp.title }}</h1>
               <div class="detail-developer-row">
                 <span class="dev-link">{{ selectedApp.developer_name }}</span>
+                <span class="seal-stamp">V3 VERIFIED</span>
               </div>
               <div class="detail-badges-row">
-                <span class="badge-category">{{ selectedApp.category_name }}</span>
-                <span class="badge-iap">{{ selectedApp.is_free ? '무료' : selectedApp.price_label }}</span>
-                <span class="badge-signature">{{ selectedApp.license_spdx || selectedApp.monetization }}</span>
+                <span class="badge-chip">{{ selectedApp.category_name }}</span>
+                <span class="badge-chip">{{ selectedApp.is_free ? '무료' : selectedApp.price_label }}</span>
+                <span class="badge-chip mono">{{ selectedApp.license_spdx || selectedApp.monetization }}</span>
               </div>
             </div>
           </div>
 
-          <!-- Quick Statistics Ribbon (Google Play Style) -->
           <div class="stats-ribbon">
             <div class="stat-column">
               <div class="stat-top">
@@ -290,7 +315,6 @@
             </div>
           </div>
 
-          <!-- Install / Purchase Primary Action Bar -->
           <div class="install-action-container">
             <button
               class="primary-install-cta"
@@ -300,7 +324,7 @@
             >
               <template v-if="isDownloading">
                 <span class="spinner-ring"></span>
-                <span>보안 검증 및 다운로드 중 ({{ downloadProgress }}%)...</span>
+                <span>보안 검증 및 다운로드 중 ({{ downloadProgress }}%)…</span>
               </template>
               <template v-else-if="hasDownloaded">
                 <span>✓ 다운로드 시작됨 (SHA-256 확인)</span>
@@ -313,25 +337,23 @@
               </template>
             </button>
             <span class="install-footnote">
-              🔒 서명된 다운로드 URL(15분 만료) · SHA-256 체크섬 제공
+              서명된 다운로드 URL(15분 만료) · SHA-256 체크섬 제공
             </span>
           </div>
 
-          <!-- Phone Screenshots Carousel (Google Play Style) -->
           <div v-if="selectedApp.media.length > 0" class="screenshots-section">
             <h3 class="detail-section-title">스크린샷 미리보기</h3>
-            <div class="screenshots-carousel">
+            <div class="screenshots-rail">
               <div
                 v-for="shot in selectedApp.media"
                 :key="shot.url"
-                class="screenshot-phone-frame"
+                class="screenshot-frame"
               >
-                <img class="phone-screen-inner" :src="shot.url" :alt="selectedApp.title" loading="lazy" />
+                <img class="screenshot-img" :src="shot.url" :alt="selectedApp.title" loading="lazy" />
               </div>
             </div>
           </div>
 
-          <!-- About This App (Detailed Description) -->
           <div class="about-app-section">
             <h3 class="detail-section-title">앱 정보</h3>
             <p class="about-description">{{ selectedApp.description || '등록된 설명이 없습니다.' }}</p>
@@ -348,26 +370,31 @@
             </p>
           </div>
 
-          <!-- Data Safety & Privacy Nutrition Label -->
           <div class="data-safety-section">
             <h3 class="detail-section-title">데이터 보안 및 프라이버시</h3>
             <div class="safety-card">
               <div class="safety-item">
-                <span class="safety-icon">🔒</span>
+                <span class="safety-marker" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+                </span>
                 <div>
                   <strong>데이터 전송 중 암호화</strong>
                   <p>보안 연결(TLS 1.3 / HTTPS)을 통해 모든 사용자 데이터가 암호화되어 전송됩니다.</p>
                 </div>
               </div>
               <div class="safety-item">
-                <span class="safety-icon">🚫</span>
+                <span class="safety-marker" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9" /><path d="M5.5 5.5l13 13" /></svg>
+                </span>
                 <div>
                   <strong>제3자 데이터 판매 금지</strong>
                   <p>개발사는 사용자의 개인정보나 활동 내역을 타사 광고 네트워크에 판매하지 않습니다.</p>
                 </div>
               </div>
               <div class="safety-item">
-                <span class="safety-icon">🛡️</span>
+                <span class="safety-marker seal" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 5V11.5C4 16.5 7.5 21 12 22C16.5 21 20 16.5 20 11.5V5L12 2Z" /><path d="M9 12L11 14L15 9" /></svg>
+                </span>
                 <div>
                   <strong>서명 인증서 지문</strong>
                   <p>{{ selectedApp.cert_short ? `SHA-256: ${selectedApp.cert_short}…` : '등록된 서명 정보가 없습니다.' }}</p>
@@ -376,13 +403,12 @@
             </div>
           </div>
 
-          <!-- Ratings and Reviews Histogram (Google Play Style) -->
           <div class="reviews-section">
             <h3 class="detail-section-title">평점 및 리뷰</h3>
             <div class="ratings-overview-card">
               <div class="rating-big-col">
                 <div class="big-score">{{ selectedApp.rating.toFixed(1) }}</div>
-                <div class="stars-gold">★★★★★</div>
+                <div class="stars-row">★★★★★</div>
                 <div class="total-reviews-count">{{ modalReviews.length }}개의 평점</div>
               </div>
               <div class="histogram-col">
@@ -393,7 +419,6 @@
               </div>
             </div>
 
-            <!-- User Review Cards -->
             <div v-if="modalReviews.length === 0" class="home-status">아직 등록된 리뷰가 없습니다.</div>
             <div v-else class="user-reviews-list">
               <div v-for="rev in modalReviews" :key="rev.id" class="review-card">
@@ -414,8 +439,7 @@
       </div>
     </div>
 
-    <!-- Interactive Toast Notification -->
-    <div v-if="toastMessage" class="play-toast">
+    <div v-if="toastMessage" class="ledger-toast">
       {{ toastMessage }}
     </div>
   </div>
@@ -490,8 +514,10 @@ function iconFor(title: string, seed: string): string {
   const ch = (title || '?').trim().slice(0, 1).toUpperCase() || '?'
   let h = 0
   for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0
-  const hue = h % 360
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="hsl(${hue},55%,38%)"/><text x="32" y="42" font-size="28" font-weight="700" text-anchor="middle" fill="white" font-family="sans-serif">${ch}</text></svg>`
+  const dark = h % 2 === 0
+  const bg = dark ? '#1a1611' : '#f4f3ef'
+  const fg = dark ? '#faf9f6' : '#1a1611'
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 64 64"><rect width="64" height="64" rx="10" fill="${bg}"/><rect x="0" y="56" width="64" height="8" fill="#b3261e"/><text x="32" y="40" font-size="26" font-weight="800" text-anchor="middle" fill="${fg}" font-family="sans-serif">${ch}</text></svg>`
   return 'data:image/svg+xml,' + encodeURIComponent(svg)
 }
 
@@ -554,8 +580,6 @@ function toCard(item: CatalogAppItem, monetization = '', summary = ''): AppCard 
   }
 }
 
-
-
 const allApps = ref<AppCard[]>([])
 const chartApps = ref<AppCard[]>([])
 const isLoading = ref(true)
@@ -584,8 +608,8 @@ async function loadHome() {
     }
     categoryNames.value = names
     categoryList.value = [
-      { id: 'all', name: '전체', icon: '🌐' },
-      ...cats.map(c => ({ id: c.id, name: names[c.id], icon: '📦' }))
+      { id: 'all', name: '전체' },
+      ...cats.map(c => ({ id: c.id, name: names[c.id] }))
     ]
     const res = await api.getCatalogApps({ limit: '24' })
     allApps.value = await enrichItems(res.items || [])
@@ -610,8 +634,8 @@ async function loadChart() {
   }
 }
 
-const categoryList = ref<Array<{ id: string; name: string; icon: string }>>([
-  { id: 'all', name: '전체', icon: '🌐' }
+const categoryList = ref<Array<{ id: string; name: string }>>([
+  { id: 'all', name: '전체' }
 ])
 
 const selectedCategory = ref('all')
@@ -636,11 +660,7 @@ function loadWishlist() {
   }
 }
 
-const BANNER_GRADIENTS = [
-  'linear-gradient(135deg, #0b1a3a 0%, #0d2b59 50%, #0a4b78 100%)',
-  'linear-gradient(135deg, #062b1e 0%, #0c4a34 50%, #0a5c40 100%)',
-  'linear-gradient(135deg, #240a3e 0%, #43126b 50%, #68178d 100%)'
-]
+const BANNER_TONES = ['ink', 'paper', 'seal']
 
 const billboardBanners = computed(() =>
   allApps.value.slice(0, 3).map((app, idx) => ({
@@ -648,16 +668,19 @@ const billboardBanners = computed(() =>
     tag: '★ 평점 ' + app.rating.toFixed(1) + ' · ' + app.category_name,
     title: app.title,
     subtitle: app.summary || app.package_name,
-    gradient: BANNER_GRADIENTS[idx % BANNER_GRADIENTS.length],
+    tone: BANNER_TONES[idx % BANNER_TONES.length],
     app
   }))
 )
 
-// Filtered apps based on selected category pill
 const filteredRecommendedApps = computed(() => {
   if (selectedCategory.value === 'all') return allApps.value
   return allApps.value.filter(a => a.category === selectedCategory.value)
 })
+
+const gamesApps = computed(() =>
+  allApps.value.filter(a => a.category === 'games').slice(0, 6)
+)
 
 const chartFilteredApps = computed(() => chartApps.value)
 
@@ -822,1251 +845,1273 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* ==========================================================================
-   Google Play Store & Apple App Store Pixel-Perfect Component Styles
-   ========================================================================== */
-
-.play-home-root {
+.ledger-home {
   max-width: 1360px;
   margin: 0 auto;
   padding: 0 24px 60px;
 }
 .home-status {
-  padding: 24px;
+  padding: 32px 24px;
   text-align: center;
-  color: var(--play-text-secondary, #9AA0A6);
+  color: var(--bn-text-muted);
   font-size: 14px;
+  border: 1px dashed var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
 }
 .home-error {
-  color: #fca5a5;
+  color: var(--bn-danger-red);
+  border-color: var(--bn-danger-red);
 }
 
-/* 1. Category Pills Bar */
-.category-pills-bar {
-  padding: 16px 0 24px;
+/* Category ledger tabs */
+.ledger-tabs-bar {
+  padding: 18px 0;
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  border-bottom: 1px solid var(--bn-border-subtle);
 }
-.category-pills-bar::-webkit-scrollbar {
+.ledger-tabs-bar::-webkit-scrollbar {
   display: none;
 }
-
-.category-pills-container {
+.ledger-tabs {
   display: flex;
-  gap: 10px;
+  gap: 4px;
 }
-
-.cat-chip-btn {
+.ledger-tab {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
-  padding: 8px 18px;
-  border-radius: 9999px;
-  border: 1px solid var(--play-border, #3c4043);
-  background-color: var(--play-card-bg, #28292a);
-  color: var(--play-text-primary, #e8eaed);
-  font-size: 13px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 12px;
+  font-family: var(--bn-font-sans);
+  font-size: 14px;
   font-weight: 600;
+  color: var(--bn-text-secondary);
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s ease;
+}
+.ledger-tab:hover {
+  color: var(--bn-text-primary);
+}
+.ledger-tab.active {
+  color: var(--bn-text-primary);
+  border-bottom-color: var(--bn-ink);
+}
+.tab-index {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  color: var(--bn-text-muted);
+}
+.ledger-tab.active .tab-index {
+  color: var(--bn-seal);
 }
 
-.cat-chip-btn:hover {
-  border-color: var(--play-accent, #00a870);
-  background-color: var(--play-subtle-bg, #131314);
+/* Featured board */
+.board-section {
+  margin: 24px 0 8px;
 }
-
-.cat-chip-btn.active {
-  background-color: var(--play-accent, #01875f);
-  border-color: var(--play-accent, #01875f);
-  color: #ffffff;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(1, 135, 95, 0.4);
-}
-
-/* 2. Billboard Showcase (Hero Carousel) */
-.billboard-section {
-  margin-bottom: 32px;
-}
-
-.billboard-container {
+.board-frame {
   position: relative;
 }
-
-.billboard-slider {
+.board-slider {
   position: relative;
-  min-height: 380px;
-  border-radius: 28px;
+  min-height: 340px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-lg);
   overflow: hidden;
-  box-shadow: var(--play-shadow);
 }
-
-.billboard-card {
+.board-card {
   display: none;
-  grid-template-columns: 1.3fr 1fr;
-  align-items: center;
-  gap: 40px;
-  padding: 48px;
-  min-height: 380px;
+  grid-template-columns: 1.4fr 1fr;
+  min-height: 340px;
   cursor: pointer;
   box-sizing: border-box;
 }
-
-.billboard-card.active {
+.board-card.active {
   display: grid;
-  animation: fadeIn 0.4s ease;
 }
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.99); }
-  to { opacity: 1; transform: scale(1); }
+.board-card.tone-ink {
+  background-color: var(--bn-ink);
+  color: var(--bn-bg-canvas);
 }
-
-.billboard-tags {
+.board-card.tone-paper {
+  background-color: var(--bn-bg-surface);
+  color: var(--bn-text-primary);
+}
+.board-card.tone-seal {
+  background-color: var(--bn-seal);
+  color: #fff;
+}
+.board-content {
+  padding: 40px;
   display: flex;
-  gap: 10px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  justify-content: center;
 }
-
-.tag-spotlight {
-  font-size: 11px;
-  font-weight: 800;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  background-color: #f59e0b;
-  color: #000000;
-}
-
-.tag-verified {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  background-color: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  backdrop-filter: blur(8px);
-}
-
-.billboard-title {
-  font-size: 34px;
-  font-weight: 800;
-  color: #ffffff;
-  margin: 0 0 12px;
-  letter-spacing: -0.6px;
-  line-height: 1.2;
-}
-
-.billboard-subtitle {
-  font-size: 15px;
-  color: #cbd5e1;
-  line-height: 1.6;
-  margin: 0 0 24px;
-  max-width: 520px;
-}
-
-.billboard-meta-row {
+.board-kicker {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: 12px;
+  margin-bottom: 14px;
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
 }
-
-.billboard-app-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+.kicker-no {
+  opacity: 0.65;
 }
-
-.app-info-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #ffffff;
+.kicker-tag {
+  border: 1px solid currentColor;
+  border-radius: var(--bn-radius-sm);
+  padding: 2px 8px;
+  opacity: 0.9;
 }
-
-.app-info-dev {
-  font-size: 13px;
-  color: #94a3b8;
+.board-title {
+  font-family: var(--bn-font-display);
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin: 0 0 10px;
 }
-
-.billboard-actions {
+.board-subtitle {
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.75;
+  margin: 0 0 24px;
+  max-width: 480px;
+}
+.board-app-row {
   display: flex;
+  align-items: center;
   gap: 14px;
+  margin-bottom: 26px;
 }
-
-.play-btn-install {
+.board-app-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--bn-radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.board-app-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.app-info-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+.app-info-dev {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+.seal-stamp {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  border: 1px solid currentColor;
+  border-radius: var(--bn-radius-sm);
+  padding: 3px 8px;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+.tone-paper .seal-stamp,
+.seal-stamp {
+  color: var(--bn-seal);
+  border-color: var(--bn-seal);
+}
+.tone-ink .seal-stamp,
+.tone-seal .seal-stamp {
+  color: inherit;
+  border-color: currentColor;
+}
+.board-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.btn-ink {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 28px;
-  background-color: #01875f;
-  color: #ffffff;
+  padding: 12px 24px;
+  background-color: var(--bn-action-bg);
+  color: var(--bn-action-text);
   border: none;
-  border-radius: 9999px;
+  border-radius: var(--bn-radius-sm);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(1, 135, 95, 0.5);
-  transition: transform 0.15s ease, background-color 0.15s ease;
 }
-
-.play-btn-install:hover {
-  background-color: #00a870;
-  transform: translateY(-2px);
+.tone-ink .btn-ink {
+  background-color: var(--bn-bg-canvas);
+  color: var(--bn-ink);
 }
-
-.play-btn-install.mini {
-  padding: 6px 18px;
-  font-size: 12px;
+.tone-seal .btn-ink {
+  background-color: #fff;
+  color: var(--bn-seal-ink);
 }
-
-.play-btn-info {
-  padding: 12px 20px;
-  background-color: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 9999px;
-  color: #ffffff;
+.btn-ink:hover {
+  opacity: 0.88;
+}
+.btn-text {
+  background: none;
+  border: none;
+  color: inherit;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  backdrop-filter: blur(8px);
-  transition: background-color 0.15s ease;
+  padding: 12px 4px;
+  opacity: 0.8;
 }
-
-.play-btn-info:hover {
-  background-color: rgba(255, 255, 255, 0.25);
+.btn-text:hover {
+  opacity: 1;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
-
-.billboard-graphic {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.device-mockup-frame {
-  width: 200px;
-  height: 320px;
-  background-color: #000000;
-  border-radius: 28px;
-  border: 4px solid #334155;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-  position: relative;
-  overflow: hidden;
-}
-
-.mockup-header-notch {
-  width: 70px;
-  height: 14px;
-  background-color: #000000;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 10;
-}
-
-.mockup-screen {
-  width: 100%;
-  height: 100%;
-}
-
-.carousel-dots-row {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-.dot-btn {
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  border: none;
-  background-color: var(--play-border);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.dot-btn.active {
-  width: 24px;
-  background-color: var(--play-accent, #01875f);
-}
-
-/* 3. Play Protect Strip */
-.play-protect-strip {
-  background-color: var(--play-card-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 20px;
-  padding: 20px 28px;
-  margin-bottom: 36px;
-  box-shadow: var(--play-shadow);
-}
-
-.protect-inner {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.protect-icon-shield {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: rgba(1, 135, 95, 0.12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.protect-text {
-  flex: 1;
-}
-
-.protect-text strong {
-  display: block;
-  font-size: 15px;
-  color: var(--play-text-primary);
-  margin-bottom: 4px;
-}
-
-.protect-text p {
-  font-size: 13px;
-  color: var(--play-text-secondary);
-  margin: 0;
-  line-height: 1.4;
-}
-
-.protect-stat {
+.board-figure {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding-left: 20px;
-  border-left: 1px solid var(--play-border);
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: 32px;
+  border-left: 1px solid currentColor;
+  opacity: 1;
+  position: relative;
 }
-
-.stat-number {
-  font-size: 24px;
-  font-weight: 800;
-  color: var(--play-accent);
+.tone-paper .board-figure {
+  border-left-color: var(--bn-border-subtle);
+  background-color: var(--bn-bg-well);
 }
-
-.stat-label {
+.figure-rating {
+  font-family: var(--bn-font-display);
+  font-weight: 900;
+  font-size: 92px;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.figure-caption {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  opacity: 0.65;
+  margin-top: 8px;
+}
+.figure-index {
+  position: absolute;
+  top: 24px;
+  right: 28px;
+  font-family: var(--bn-font-mono);
+  font-size: 12px;
+  opacity: 0.5;
+}
+.board-pager {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.pager-btn {
+  background: none;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  color: var(--bn-text-muted);
+  font-family: var(--bn-font-mono);
   font-size: 11px;
-  color: var(--play-text-secondary);
-  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.pager-btn:hover {
+  border-color: var(--bn-border-strong);
+  color: var(--bn-text-primary);
+}
+.pager-btn.active {
+  background-color: var(--bn-ink);
+  border-color: var(--bn-ink);
+  color: var(--bn-bg-canvas);
 }
 
-/* 4. Collection Section & Horizontal Card Rows */
-.play-collection-section {
-  margin-bottom: 44px;
+/* Verification strip */
+.verify-strip {
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  margin: 24px 0 8px;
+}
+.verify-inner {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 24px;
+}
+.verify-seal {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bn-seal);
+  border: 1px solid var(--bn-seal);
+  border-radius: var(--bn-radius-sm);
+}
+.verify-text {
+  flex: 1;
+}
+.verify-text strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 3px;
+}
+.verify-text p {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--bn-text-secondary);
+  margin: 0;
+}
+.verify-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-left: 18px;
+  border-left: 1px solid var(--bn-border-subtle);
+  flex-shrink: 0;
+}
+.stat-number {
+  font-family: var(--bn-font-display);
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+.stat-label {
+  font-family: var(--bn-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--bn-text-muted);
 }
 
-.section-title-row {
+/* Ledger sections */
+.ledger-section {
+  margin-top: 44px;
+}
+.section-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-bottom: 18px;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--bn-ink);
 }
-
-.collection-title {
+.section-head-left {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+.section-no {
+  font-family: var(--bn-font-mono);
+  font-size: 12px;
+  color: var(--bn-seal);
+}
+.section-title {
+  font-family: var(--bn-font-display);
   font-size: 22px;
-  font-weight: 700;
-  color: var(--play-text-primary);
-  margin: 0 0 4px;
-  letter-spacing: -0.4px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+  white-space: nowrap;
 }
-
-.collection-sub {
-  font-size: 13px;
-  color: var(--play-text-secondary);
+.section-sub {
+  font-size: 12px;
+  color: var(--bn-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
 .see-all-btn {
   background: none;
   border: none;
-  color: var(--play-accent);
+  color: var(--bn-text-primary);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 8px;
-  transition: background-color 0.15s ease;
+  padding: 6px 4px;
+  white-space: nowrap;
 }
-
 .see-all-btn:hover {
-  background-color: var(--play-subtle-bg);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
-.horizontal-scroll-container {
+/* App rail */
+.app-rail {
   display: flex;
-  gap: 18px;
+  gap: 14px;
   overflow-x: auto;
-  padding-bottom: 12px;
-  -webkit-overflow-scrolling: touch;
+  padding-bottom: 10px;
   scrollbar-width: thin;
 }
-
-.play-app-card {
-  flex: 0 0 170px;
-  background-color: var(--play-card-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 20px;
-  padding: 16px;
+.app-card {
+  flex: 0 0 196px;
+  background-color: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  padding: 14px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
-
-.play-app-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--play-hover-shadow);
-  border-color: var(--play-accent);
+.app-card:hover {
+  border-color: var(--bn-border-strong);
 }
-
-.card-icon-squircle {
-  width: 72px;
-  height: 72px;
-  margin-bottom: 12px;
-  border-radius: 18px;
+.card-icon-tile {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 10px;
+  border-radius: var(--bn-radius-md);
   overflow: hidden;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.12);
 }
-
+.card-icon-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .card-title {
   font-size: 14px;
   font-weight: 700;
-  color: var(--play-text-primary);
-  margin: 0 0 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.card-dev {
-  font-size: 12px;
-  color: var(--play-text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 8px;
-}
-
-.card-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--play-text-secondary);
-  margin-bottom: 12px;
-}
-
-.card-rating {
-  font-weight: 700;
-  color: #f59e0b;
-}
-
-.card-action-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: auto;
-  padding-top: 8px;
-  border-top: 1px solid var(--play-border);
-}
-
-.card-price {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--play-accent);
-}
-
-.card-price.free {
-  color: #10b981;
-}
-
-.mini-install-btn {
-  padding: 4px 12px;
-  background-color: var(--play-subtle-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 9999px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--play-accent);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.mini-install-btn:hover {
-  background-color: var(--play-accent);
-  color: #ffffff;
-}
-
-/* 5. Top Charts Grid (Signature Google Play 3-Column List) */
-.charts-section {
-  background-color: var(--play-card-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 24px;
-  padding: 28px;
-}
-
-.chart-tab-group {
-  display: flex;
-  gap: 8px;
-  background-color: var(--play-subtle-bg);
-  padding: 4px;
-  border-radius: 9999px;
-  border: 1px solid var(--play-border);
-}
-
-.chart-tab-btn {
-  padding: 6px 16px;
-  border-radius: 9999px;
-  border: none;
-  background: transparent;
-  color: var(--play-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.chart-tab-btn.active {
-  background-color: var(--play-accent);
-  color: #ffffff;
-  font-weight: 700;
-}
-
-.top-charts-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-  gap: 16px 24px;
-  margin-top: 20px;
-}
-
-.chart-row-item {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 14px;
-  border-radius: 16px;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.chart-row-item:hover {
-  background-color: var(--play-subtle-bg);
-}
-
-.chart-rank-number {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--play-text-secondary);
-  width: 24px;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.chart-rank-number.rank-1 { color: #f59e0b; font-size: 18px; }
-.chart-rank-number.rank-2 { color: #94a3b8; font-size: 17px; }
-.chart-rank-number.rank-3 { color: #d97706; font-size: 17px; }
-
-.chart-icon-squircle {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
-  overflow: hidden;
-  flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-}
-
-.chart-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.chart-app-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--play-text-primary);
   margin: 0 0 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.chart-app-dev {
+.card-dev {
   font-size: 12px;
-  color: var(--play-text-secondary);
+  color: var(--bn-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 8px;
+}
+.card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--bn-text-secondary);
+  margin-bottom: 10px;
+}
+.card-rating {
+  font-family: var(--bn-font-mono);
+  font-weight: 600;
+  color: var(--bn-text-primary);
+}
+.card-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--bn-border-subtle);
+}
+.card-price {
+  font-family: var(--bn-font-mono);
+  font-size: 12px;
+  color: var(--bn-text-secondary);
+}
+.card-price.free {
+  color: var(--bn-trust-verified);
+}
+.mini-install-btn {
+  padding: 5px 14px;
+  background-color: transparent;
+  border: 1px solid var(--bn-border-strong);
+  border-radius: var(--bn-radius-sm);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bn-text-primary);
+  cursor: pointer;
+}
+.mini-install-btn:hover {
+  background-color: var(--bn-ink);
+  border-color: var(--bn-ink);
+  color: var(--bn-bg-canvas);
+}
+
+/* Games strip */
+.games-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 0;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  overflow: hidden;
+}
+.game-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--bn-border-subtle);
+}
+.game-row:hover {
+  background-color: var(--bn-bg-well);
+}
+.game-rank {
+  font-family: var(--bn-font-mono);
+  font-size: 12px;
+  color: var(--bn-seal);
+  width: 24px;
+  flex-shrink: 0;
+}
+.game-icon-tile {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--bn-radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.game-icon-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.game-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.game-info strong {
+  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.chart-app-meta {
+.game-info span {
   font-size: 11px;
-  color: var(--play-text-secondary);
-  display: flex;
-  gap: 6px;
-  margin-top: 2px;
+  color: var(--bn-text-muted);
 }
 
+/* Charts ledger */
+.charts-panel {
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  padding: 24px;
+}
+.charts-panel .section-head {
+  margin-bottom: 8px;
+}
+.chart-tab-group {
+  display: flex;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.chart-tab-btn {
+  padding: 7px 16px;
+  border: none;
+  border-left: 1px solid var(--bn-border-subtle);
+  background: transparent;
+  color: var(--bn-text-secondary);
+  font-family: var(--bn-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chart-tab-btn:first-child {
+  border-left: none;
+}
+.chart-tab-btn.active {
+  background-color: var(--bn-ink);
+  color: var(--bn-bg-canvas);
+}
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 0 28px;
+}
+.chart-row-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--bn-border-subtle);
+  cursor: pointer;
+}
+.chart-row-item:hover {
+  background-color: var(--bn-bg-well);
+}
+.chart-rank-number {
+  font-family: var(--bn-font-display);
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: var(--bn-text-primary);
+  width: 44px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.chart-icon-tile {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--bn-radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.chart-icon-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.chart-info {
+  flex: 1;
+  min-width: 0;
+}
+.chart-app-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chart-app-dev {
+  font-size: 12px;
+  color: var(--bn-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chart-app-meta {
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  color: var(--bn-text-muted);
+  display: flex;
+  gap: 8px;
+  margin-top: 3px;
+}
 .chart-btn-box {
   flex-shrink: 0;
 }
-
 .pill-install-btn {
   padding: 6px 16px;
-  border-radius: 9999px;
-  background-color: var(--play-subtle-bg);
-  border: 1px solid var(--play-border);
-  color: var(--play-accent);
+  border-radius: var(--bn-radius-pill);
+  background-color: transparent;
+  border: 1px solid var(--bn-border-strong);
+  color: var(--bn-text-primary);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
-
 .pill-install-btn:hover {
-  background-color: var(--play-accent);
-  color: #ffffff;
+  background-color: var(--bn-ink);
+  border-color: var(--bn-ink);
+  color: var(--bn-bg-canvas);
 }
 
-/* 6. Today Editorial Story Card */
-.today-editorial-section {
-  margin-bottom: 44px;
+/* Editorial: the one ink panel */
+.editorial-section {
+  margin-top: 44px;
 }
-
-.editorial-card {
-  position: relative;
-  min-height: 280px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
-  overflow: hidden;
-  box-shadow: var(--play-shadow);
-  display: flex;
-  align-items: center;
-  padding: 40px;
-  box-sizing: border-box;
+.editorial-panel {
+  background-color: var(--bn-ink);
+  color: var(--bn-bg-canvas);
+  border-radius: var(--bn-radius-lg);
+  padding: 44px;
 }
-
-.editorial-overlay {
-  max-width: 680px;
-}
-
-.editorial-eyebrow {
-  display: inline-block;
+.editorial-kicker {
+  font-family: var(--bn-font-mono);
   font-size: 11px;
-  font-weight: 800;
-  color: #a5b4fc;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  margin-bottom: 8px;
+  letter-spacing: 0.14em;
+  opacity: 0.6;
 }
-
 .editorial-headline {
-  font-size: 28px;
-  font-weight: 800;
-  color: #ffffff;
-  margin: 0 0 12px;
-  letter-spacing: -0.5px;
-  line-height: 1.3;
+  font-family: var(--bn-font-display);
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin: 12px 0;
+  max-width: 640px;
 }
-
 .editorial-summary {
   font-size: 14px;
-  color: #e0e7ff;
-  line-height: 1.6;
-  margin: 0 0 24px;
+  line-height: 1.7;
+  opacity: 0.75;
+  margin: 0 0 28px;
+  max-width: 640px;
 }
-
 .editorial-app-strip {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px 18px;
-  background-color: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
+  border-top: 1px solid currentColor;
+  padding-top: 20px;
   cursor: pointer;
-  backdrop-filter: blur(10px);
+  max-width: 640px;
 }
-
 .editorial-app-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--bn-radius-md);
   overflow: hidden;
+  flex-shrink: 0;
 }
-
+.editorial-app-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .editorial-app-text {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
-
 .editorial-app-text strong {
-  font-size: 13px;
-  color: #ffffff;
+  font-size: 14px;
 }
-
 .editorial-app-text span {
-  font-size: 11px;
-  color: #c7d2fe;
+  font-size: 12px;
+  opacity: 0.65;
+}
+.editorial-install-btn {
+  background-color: var(--bn-bg-canvas);
+  color: var(--bn-ink);
+  border: none;
+  border-radius: var(--bn-radius-sm);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 22px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.editorial-install-btn:hover {
+  opacity: 0.88;
 }
 
-/* 7. Google Play App Detail Modal Sheet */
-.app-modal-backdrop {
+/* Detail sheet */
+.sheet-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
+  inset: 0;
+  background-color: rgba(20, 17, 12, 0.55);
   z-index: 2000;
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding: 20px;
+  align-items: flex-start;
+  overflow-y: auto;
+  padding: 40px 16px;
+  box-sizing: border-box;
 }
-
-.app-modal-sheet {
-  background-color: var(--play-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 28px;
+.sheet {
   width: 100%;
-  max-width: 840px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
+  max-width: 860px;
+  background-color: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-lg);
+  box-shadow: var(--bn-shadow-pop);
   overflow: hidden;
-  box-shadow: 0 25px 60px rgba(0,0,0,0.8);
-  animation: slideUp 0.3s ease;
 }
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(40px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.modal-top-bar {
+.sheet-topbar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--play-border);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--bn-border-subtle);
+  background-color: var(--bn-bg-well);
 }
-
-.modal-close-btn, .modal-icon-btn {
-  background: var(--play-subtle-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  color: var(--play-text-primary);
-  font-size: 15px;
-  cursor: pointer;
+.sheet-kicker {
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--bn-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet-top-actions {
   display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.sheet-icon-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--bn-radius-sm);
+  color: var(--bn-text-secondary);
+  cursor: pointer;
 }
-
-.modal-close-btn:hover, .modal-icon-btn:hover {
-  background-color: var(--play-border);
+.sheet-icon-btn:hover {
+  color: var(--bn-text-primary);
+  border-color: var(--bn-border-subtle);
+  background-color: var(--bn-bg-surface);
 }
-
-.modal-top-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.modal-scroll-body {
-  padding: 28px 36px;
+.sheet-body {
+  padding: 28px;
+  max-height: calc(100vh - 220px);
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
-
-/* Detail Header Profile */
 .detail-header-row {
   display: flex;
-  gap: 24px;
-  align-items: center;
-  margin-bottom: 24px;
+  gap: 18px;
+  align-items: flex-start;
 }
-
 .detail-icon-large {
-  width: 88px;
-  height: 88px;
-  border-radius: 22px;
+  width: 84px;
+  height: 84px;
+  border-radius: var(--bn-radius-lg);
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  border: 1px solid var(--bn-border-subtle);
 }
-
+.detail-icon-large img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.detail-title-col {
+  min-width: 0;
+}
 .detail-app-name {
-  font-size: 26px;
-  font-weight: 800;
-  color: var(--play-text-primary);
+  font-family: var(--bn-font-display);
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.025em;
   margin: 0 0 6px;
-  letter-spacing: -0.4px;
+  line-height: 1.15;
 }
-
 .detail-developer-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   margin-bottom: 10px;
 }
-
 .dev-link {
   font-size: 14px;
   font-weight: 600;
-  color: var(--play-accent);
-  text-decoration: none;
+  color: var(--bn-text-secondary);
 }
-
-.verified-check {
-  font-size: 12px;
-  color: #10b981;
-  font-weight: 800;
+.detail-header-row .seal-stamp {
+  margin-left: 0;
 }
-
 .detail-badges-row {
   display: flex;
-  gap: 8px;
   flex-wrap: wrap;
+  gap: 8px;
 }
-
-.badge-category, .badge-iap, .badge-signature {
+.badge-chip {
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  padding: 3px 10px;
+  color: var(--bn-text-secondary);
+}
+.badge-chip.mono {
+  font-family: var(--bn-font-mono);
   font-size: 11px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background-color: var(--play-subtle-bg);
-  border: 1px solid var(--play-border);
-  color: var(--play-text-secondary);
+  font-weight: 400;
 }
 
-.badge-signature {
-  background-color: rgba(1, 135, 95, 0.12);
-  color: var(--play-accent);
-  border-color: rgba(1, 135, 95, 0.3);
-}
-
-/* Stats Ribbon */
+/* Stats ribbon */
 .stats-ribbon {
   display: flex;
-  justify-content: space-around;
-  align-items: center;
-  padding: 16px 0;
-  border-top: 1px solid var(--play-border);
-  border-bottom: 1px solid var(--play-border);
-  margin-bottom: 24px;
+  align-items: stretch;
+  margin: 24px 0;
+  border-top: 1px solid var(--bn-border-subtle);
+  border-bottom: 1px solid var(--bn-border-subtle);
 }
-
 .stat-column {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 2px;
+  padding: 14px 8px;
 }
-
 .stat-top {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
 }
-
 .stat-val {
-  font-size: 16px;
+  font-family: var(--bn-font-display);
+  font-size: 20px;
   font-weight: 800;
-  color: var(--play-text-primary);
 }
-
 .stat-star {
-  color: #f59e0b;
-  font-size: 13px;
+  color: var(--bn-text-primary);
+  font-size: 14px;
 }
-
 .stat-bottom {
   font-size: 11px;
-  color: var(--play-text-secondary);
-  margin-top: 2px;
+  color: var(--bn-text-muted);
 }
-
 .stat-divider {
   width: 1px;
-  height: 24px;
-  background-color: var(--play-border);
+  background-color: var(--bn-border-subtle);
 }
-
 .badge-pegi {
-  font-size: 11px;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background-color: #10b981;
-  color: #ffffff;
+  font-family: var(--bn-font-mono);
+  font-size: 12px;
+  border: 1px solid var(--bn-border-strong);
+  border-radius: var(--bn-radius-sm);
+  padding: 1px 8px;
 }
 
-/* Action CTA */
+/* Install action */
 .install-action-container {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
-
 .primary-install-cta {
-  width: 100%;
-  padding: 14px;
-  background-color: #01875f;
-  color: #ffffff;
-  border: none;
-  border-radius: 9999px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  box-shadow: 0 4px 16px rgba(1, 135, 95, 0.5);
-  transition: all 0.2s ease;
+  width: 100%;
+  padding: 15px;
+  background-color: var(--bn-action-bg);
+  color: var(--bn-action-text);
+  border: none;
+  border-radius: var(--bn-radius-sm);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
 }
-
 .primary-install-cta:hover:not(:disabled) {
-  background-color: #00a870;
-  transform: translateY(-2px);
+  background-color: var(--bn-action-bg-hover);
 }
-
-.primary-install-cta.downloading {
-  background-color: #0284c7;
-  cursor: wait;
+.primary-install-cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
-
 .primary-install-cta.installed {
-  background-color: #059669;
+  background-color: var(--bn-trust-verified);
+  color: #fff;
 }
-
 .spinner-ring {
   width: 16px;
   height: 16px;
-  border: 2px solid #ffffff;
+  border: 2px solid currentColor;
   border-top-color: transparent;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: ledger-spin 0.8s linear infinite;
 }
-
-@keyframes spin {
+@keyframes ledger-spin {
   to { transform: rotate(360deg); }
 }
-
 .install-footnote {
+  font-family: var(--bn-font-mono);
   font-size: 11px;
-  color: var(--play-text-secondary);
+  color: var(--bn-text-muted);
   text-align: center;
 }
 
-/* Screenshots Carousel */
-.screenshots-section {
-  margin-bottom: 32px;
-}
-
+/* Sheet sections */
 .detail-section-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--play-text-primary);
-  margin: 0 0 16px;
+  font-family: var(--bn-font-display);
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--bn-border-subtle);
 }
-
-.screenshots-carousel {
+.screenshots-section,
+.about-app-section,
+.data-safety-section,
+.reviews-section {
+  margin-bottom: 28px;
+}
+.screenshots-rail {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   overflow-x: auto;
-  padding-bottom: 12px;
-  scrollbar-width: thin;
+  padding-bottom: 8px;
 }
-
-.screenshot-phone-frame {
+.screenshot-frame {
   flex: 0 0 150px;
-  height: 270px;
-  background-color: #000000;
-  border-radius: 18px;
-  border: 3px solid var(--play-border);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
   overflow: hidden;
-  box-shadow: 0 8px 18px rgba(0,0,0,0.25);
+  background-color: var(--bn-bg-well);
 }
-
-.phone-screen-inner {
+.screenshot-img {
+  display: block;
   width: 100%;
-  height: 100%;
+  height: auto;
 }
-
-/* About App & Update Notes */
-.about-app-section {
-  margin-bottom: 32px;
-}
-
 .about-description {
   font-size: 14px;
   line-height: 1.7;
-  color: var(--play-text-primary);
-  margin-bottom: 18px;
+  color: var(--bn-text-secondary);
+  margin: 0 0 12px;
+  white-space: pre-line;
 }
-
+.about-description a {
+  color: var(--bn-text-primary);
+  font-weight: 600;
+}
 .update-notes-card {
-  background-color: var(--play-subtle-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 16px;
-  padding: 16px 20px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background-color: var(--bn-bg-well);
 }
-
 .update-notes-header {
   display: flex;
   justify-content: space-between;
+  gap: 12px;
   font-size: 13px;
   margin-bottom: 8px;
-  color: var(--play-text-primary);
 }
-
 .update-notes-header span {
+  font-family: var(--bn-font-mono);
   font-size: 11px;
-  color: var(--play-text-secondary);
+  color: var(--bn-text-muted);
+  white-space: nowrap;
+}
+.update-notes-card .about-description {
+  margin-bottom: 0;
 }
 
-.update-bullets {
-  margin: 0;
-  padding-left: 20px;
-  font-size: 13px;
-  color: var(--play-text-secondary);
-  line-height: 1.6;
-}
-
-/* Data Safety */
-.data-safety-section {
-  margin-bottom: 32px;
-}
-
+/* Safety */
 .safety-card {
-  background-color: var(--play-subtle-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 16px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  overflow: hidden;
 }
-
 .safety-item {
   display: flex;
   gap: 14px;
-  align-items: flex-start;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--bn-border-subtle);
 }
-
-.safety-icon {
-  font-size: 20px;
+.safety-item:last-child {
+  border-bottom: none;
 }
-
+.safety-marker {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  color: var(--bn-text-secondary);
+}
+.safety-marker.seal {
+  color: var(--bn-seal);
+  border-color: var(--bn-seal);
+}
 .safety-item strong {
   display: block;
-  font-size: 14px;
-  color: var(--play-text-primary);
-  margin-bottom: 2px;
+  font-size: 13px;
+  margin-bottom: 3px;
 }
-
 .safety-item p {
   font-size: 12px;
-  color: var(--play-text-secondary);
+  line-height: 1.6;
+  color: var(--bn-text-secondary);
   margin: 0;
-  line-height: 1.4;
+  font-family: var(--bn-font-mono);
 }
 
-/* Ratings Histogram */
+/* Reviews */
 .ratings-overview-card {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 24px;
-  align-items: center;
-  background-color: var(--play-subtle-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 20px;
+  display: flex;
+  gap: 32px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  padding: 20px 24px;
+  margin-bottom: 16px;
 }
-
 .rating-big-col {
-  text-align: center;
-}
-
-.big-score {
-  font-size: 48px;
-  font-weight: 800;
-  color: var(--play-text-primary);
-  line-height: 1;
-  margin-bottom: 4px;
-}
-
-.stars-gold {
-  color: #f59e0b;
-  font-size: 16px;
-  margin-bottom: 4px;
-}
-
-.total-reviews-count {
-  font-size: 11px;
-  color: var(--play-text-secondary);
-}
-
-.histogram-col {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
-
+.big-score {
+  font-family: var(--bn-font-display);
+  font-size: 52px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.stars-row {
+  font-size: 13px;
+  letter-spacing: 2px;
+  margin: 6px 0;
+}
+.total-reviews-count {
+  font-size: 11px;
+  color: var(--bn-text-muted);
+}
+.histogram-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+}
 .hist-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
-  color: var(--play-text-secondary);
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  color: var(--bn-text-muted);
 }
-
 .hist-bar-bg {
   flex: 1;
-  height: 8px;
-  background-color: var(--play-border);
-  border-radius: 9999px;
+  height: 6px;
+  background-color: var(--bn-bg-well);
+  border-radius: var(--bn-radius-sm);
   overflow: hidden;
 }
-
 .hist-bar-fill {
   height: 100%;
-  background-color: #01875f;
-  border-radius: 9999px;
+  background-color: var(--bn-ink);
 }
-
-/* User Reviews */
 .user-reviews-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
-
 .review-card {
-  background-color: var(--play-subtle-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 16px;
-  padding: 18px 20px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  padding: 14px 16px;
 }
-
 .review-author-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
-
 .review-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  background-color: var(--play-accent);
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 800;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: var(--bn-ink);
+  color: var(--bn-bg-canvas);
+  font-weight: 800;
+  font-size: 14px;
+  border-radius: var(--bn-radius-sm);
 }
-
 .review-author-info {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
-
 .review-author-info strong {
   font-size: 13px;
-  color: var(--play-text-primary);
 }
-
 .review-date {
+  font-family: var(--bn-font-mono);
   font-size: 11px;
-  color: var(--play-text-secondary);
+  color: var(--bn-text-muted);
 }
-
 .review-stars {
-  color: #f59e0b;
   font-size: 12px;
+  letter-spacing: 1px;
 }
-
 .review-body {
   font-size: 13px;
-  line-height: 1.6;
-  color: var(--play-text-primary);
-  margin: 0 0 10px;
+  line-height: 1.65;
+  color: var(--bn-text-secondary);
+  margin: 0 0 8px;
 }
-
 .review-helpful {
+  font-family: var(--bn-font-mono);
   font-size: 11px;
-  color: var(--play-text-secondary);
+  color: var(--bn-trust-verified);
 }
 
 /* Toast */
-.play-toast {
+.ledger-toast {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
-  padding: 12px 24px;
-  background-color: #202124;
-  color: #ffffff;
-  border-radius: 12px;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--bn-ink);
+  color: var(--bn-bg-canvas);
   font-size: 13px;
   font-weight: 600;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  padding: 12px 22px;
+  border-radius: var(--bn-radius-sm);
+  box-shadow: var(--bn-shadow-pop);
   z-index: 3000;
-  animation: slideInToast 0.3s ease;
+  max-width: min(560px, calc(100vw - 48px));
 }
 
-@keyframes slideInToast {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Responsive Rules */
-@media (max-width: 1024px) {
-  .billboard-card {
-    grid-template-columns: 1fr;
-    padding: 32px;
-  }
-  .billboard-graphic {
-    display: none;
-  }
-  .top-charts-grid {
+@media (max-width: 900px) {
+  .board-card.active {
     grid-template-columns: 1fr;
   }
-}
-
-@media (max-width: 640px) {
-  .play-home-root {
-    padding: 0 16px 40px;
+  .board-figure {
+    border-left: none;
+    border-top: 1px solid currentColor;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 20px 28px;
   }
-  .billboard-card {
-    padding: 24px 20px;
+  .tone-paper .board-figure {
+    border-top-color: var(--bn-border-subtle);
   }
-  .billboard-title {
+  .figure-rating {
+    font-size: 56px;
+  }
+  .figure-index {
+    position: static;
+  }
+  .board-title {
+    font-size: 30px;
+  }
+  .board-content {
+    padding: 28px;
+  }
+  .ratings-overview-card {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .editorial-panel {
+    padding: 28px;
+  }
+  .editorial-headline {
     font-size: 24px;
   }
-  .modal-scroll-body {
-    padding: 20px 16px;
+  .section-sub {
+    display: none;
   }
 }
 </style>

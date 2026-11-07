@@ -74,57 +74,77 @@ onMounted(async () => {
 
 <style scoped>
 .bn-admin-page {
-  padding: 24px;
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.bn-page-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--bn-ink);
+}
+.bn-page-header h2 {
+  font-family: var(--bn-font-display);
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+.bn-text-muted {
+  color: var(--bn-text-secondary);
+  font-size: 13px;
+  margin: 0;
 }
 .bn-metrics-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
-  margin-top: 24px;
+  gap: 12px;
 }
 .bn-metric-card {
-  background-color: var(--bn-bg-surface, #FFFFFF);
-  border: 1px solid var(--bn-border-subtle, #E2E8F0);
-  border-radius: 12px;
+  background-color: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
   padding: 20px;
   display: flex;
   flex-direction: column;
 }
 .bn-metric-title {
-  font-size: 13px;
-  color: var(--bn-text-muted, #64748B);
-  font-weight: 500;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
 }
 .bn-metric-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--bn-text-primary, #0F172A);
+  font-family: var(--bn-font-display);
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
   margin: 10px 0 6px 0;
 }
 .bn-metric-value.warning {
-  color: var(--bn-danger-red, #DC2626);
+  color: var(--bn-danger-red);
 }
 .bn-metric-delta {
   font-size: 12px;
-  color: var(--bn-text-muted, #64748B);
+  color: var(--bn-text-secondary);
 }
 .bn-metric-delta.positive {
-  color: var(--bn-trust-verified, #059669);
+  color: var(--bn-trust-verified);
   font-weight: 600;
 }
 .bn-loading {
   padding: 24px;
   text-align: center;
-  color: var(--bn-text-muted, #64748B);
+  color: var(--bn-text-muted);
+  font-size: 14px;
 }
 .bn-error {
   padding: 12px 16px;
   margin-top: 12px;
-  background: #FEF2F2;
-  border: 1px solid #FECACA;
-  border-radius: 8px;
-  color: #B91C1C;
-  font-size: 14px;
+  background: var(--bn-danger-wash);
+  border: 1px solid var(--bn-danger-red);
+  border-radius: var(--bn-radius-sm);
+  color: var(--bn-danger-red);
+  font-size: 13px;
 }
 </style>
 

@@ -19,22 +19,17 @@ defineProps<{
 
 <style scoped>
 .bn-skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--bn-bg-elevated, #F1F5F9) 25%,
-    var(--bn-border-subtle, #E2E8F0) 50%,
-    var(--bn-bg-elevated, #F1F5F9) 75%
-  );
-  background-size: 200% 100%;
-  animation: bn-skeleton-shimmer 1.5s infinite linear;
+  background-color: var(--bn-bg-well);
+  border: 1px solid var(--bn-border-subtle);
+  animation: bn-skeleton-pulse 1.6s infinite ease-in-out;
 }
 
-@keyframes bn-skeleton-shimmer {
-  0% {
-    background-position: 200% 0;
+@keyframes bn-skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
   }
-  100% {
-    background-position: -200% 0;
+  50% {
+    opacity: 0.45;
   }
 }
 </style>

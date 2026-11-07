@@ -1,17 +1,15 @@
 <template>
-  <div class="bn-playstore-root" :data-theme="currentTheme">
-    <!-- Smart App Banner for Android Companion Agent -->
-    <div v-if="showSmartBanner" class="smart-companion-banner">
-      <div class="banner-inner">
-        <button class="banner-close" @click="showSmartBanner = false" title="배너 닫기">✕</button>
-        <div class="banner-icon">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="#01875F">
-            <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-1.0003s.4482-1.0003.9993-1.0003c.551 0 .9992.4486.9992 1.0003s-.4482 1.0003-.9992 1.0003m-11.046 0c-.5511 0-.9993-.4486-.9993-1.0003s.4482-1.0003.9993-1.0003c.5511 0 .9993.4486.9993 1.0003s-.4482 1.0003-.9993 1.0003m11.4045-6.02l1.996-3.4566c.1154-.1994.0471-.4535-.1527-.5688-.1994-.1152-.4535-.0471-.5688.1528l-2.0223 3.5024c-1.5791-.7197-3.3444-1.127-5.2347-1.127-1.8903 0-3.6556.4073-5.2347 1.127L4.6409 5.4491c-.1153-.1999-.3694-.268-.5688-.1528-.1998.1153-.2681.3694-.1527.5688l1.996 3.4566C2.6889 11.0867 0 14.6738 0 18.9167h24c0-4.2429-2.6889-7.83-5.8815-9.5953"/>
-          </svg>
-        </div>
+  <div class="bn-store-root" :data-theme="currentTheme">
+    <!-- Companion app notice -->
+    <div v-if="showSmartBanner" class="companion-band">
+      <div class="band-inner">
+        <button class="band-close" @click="showSmartBanner = false" title="배너 닫기" aria-label="배너 닫기">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 1l10 10M11 1L1 11" /></svg>
+        </button>
+        <span class="band-kicker">Android</span>
         <div class="banner-text">
           <strong>BookingNetwork 모바일 공식 앱</strong>
-          <span>PackageInstaller 원클릭 설치 및 백그라운드 자동 업데이트 지원 (Android 12+ 패키지 소유권 준수)</span>
+          <span>PackageInstaller 원클릭 설치 및 백그라운드 자동 업데이트 지원</span>
         </div>
         <button class="banner-download-btn" @click="downloadCompanionApp">
           스토어에서 찾기
@@ -19,96 +17,73 @@
       </div>
     </div>
 
-    <!-- Google Play Style Sticky Top Navigation Header -->
-    <header class="play-header">
-      <div class="play-header-container">
-        <!-- Brand Logo & Title -->
-        <NuxtLink to="/" class="play-logo" @click="activeTopTab = 'apps'">
-          <div class="play-logo-icon">
-            <svg viewBox="0 0 40 40" width="34" height="34" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M7 6.5C7 5.2 8.4 4.4 9.5 5.1L32 18.5C33.1 19.2 33.1 20.8 32 21.5L9.5 34.9C8.4 35.6 7 34.8 7 33.5V6.5Z" fill="url(#playGradMain)"/>
-              <path d="M7 6.5L24 23.5L32 18.5L9.5 5.1C8.4 4.4 7 5.2 7 6.5Z" fill="url(#playGradTop)" opacity="0.9"/>
-              <path d="M7 33.5L24 16.5L32 21.5L9.5 34.9C8.4 35.6 7 34.8 7 33.5Z" fill="url(#playGradBtm)" opacity="0.85"/>
-              <defs>
-                <linearGradient id="playGradMain" x1="7" y1="5" x2="33" y2="35" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#00C9FF"/>
-                  <stop offset="0.5" stop-color="#0084FF"/>
-                  <stop offset="1" stop-color="#00E575"/>
-                </linearGradient>
-                <linearGradient id="playGradTop" x1="7" y1="5" x2="32" y2="20" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#00E575"/>
-                  <stop offset="1" stop-color="#FFDD00"/>
-                </linearGradient>
-                <linearGradient id="playGradBtm" x1="7" y1="20" x2="32" y2="35" gradientUnits="userSpaceOnUse">
-                  <stop stop-color="#FF3366"/>
-                  <stop offset="1" stop-color="#9900FF"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <div class="play-logo-text">
-            <span class="brand-name">Google Play <span class="brand-partner">| BookingNetwork</span></span>
-            <span class="brand-sub">Universal Independent Store</span>
-          </div>
+    <!-- Store masthead -->
+    <header class="masthead">
+      <div class="masthead-inner">
+        <NuxtLink to="/" class="wordmark" @click="activeTopTab = 'apps'">
+          <span class="seal-mark" aria-hidden="true">BN</span>
+          <span class="wordmark-text">
+            <span class="brand-name">App Market</span>
+            <span class="brand-sub">BOOKINGNETWORK · INDEPENDENT STORE</span>
+          </span>
         </NuxtLink>
 
-        <!-- Top Play Tabs (Google Play Web Style Navigation) -->
-        <nav class="play-top-tabs">
+        <nav class="masthead-tabs">
           <button
             class="top-tab-btn"
             :class="{ active: activeTopTab === 'games' }"
             @click="switchTopTab('games')"
           >
-            <span class="tab-icon">🎮</span> 게임
+            게임
           </button>
           <button
             class="top-tab-btn"
             :class="{ active: activeTopTab === 'apps' }"
             @click="switchTopTab('apps')"
           >
-            <span class="tab-icon">📱</span> 앱
+            앱
           </button>
           <button
             class="top-tab-btn"
             :class="{ active: activeTopTab === 'charts' }"
             @click="switchTopTab('charts')"
           >
-            <span class="tab-icon">🏆</span> 인기 차트
+            인기 차트
           </button>
           <button
             class="top-tab-btn"
             :class="{ active: activeTopTab === 'editors' }"
             @click="switchTopTab('editors')"
           >
-            <span class="tab-icon">✨</span> 에디터 추천
+            에디터 추천
           </button>
           <button
             class="top-tab-btn"
             :class="{ active: activeTopTab === 'protect' }"
             @click="switchTopTab('protect')"
           >
-            <span class="tab-icon">🛡️</span> Play 프로텍트
+            검증 현황
           </button>
         </nav>
 
-        <!-- Search Bar (Pill Shaped Google Play Style) -->
-        <div class="play-search-box" :class="{ focused: searchFocused }">
-          <svg class="search-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        <div class="masthead-search" :class="{ focused: searchFocused }">
+          <svg class="search-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
           </svg>
           <input
             v-model="searchQuery"
             type="search"
-            placeholder="앱 및 게임 검색..."
+            placeholder="앱, 게임, 개발사 검색"
             class="search-input"
             @focus="searchFocused = true"
             @blur="handleSearchBlur"
             @keyup.enter="executeSearch"
           />
-          <button v-if="searchQuery" class="search-clear-btn" @click="searchQuery = ''">✕</button>
+          <button v-if="searchQuery" class="search-clear-btn" @click="searchQuery = ''" aria-label="검색어 지우기">
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 1l10 10M11 1L1 11" /></svg>
+          </button>
 
-          <!-- Autocomplete Dropdown Preview -->
           <div v-if="searchFocused && quickSuggestions.length > 0" class="search-suggestions-dropdown">
             <div class="suggestions-label">추천 검색어</div>
             <div
@@ -117,31 +92,27 @@
               class="suggestion-item"
               @mousedown.prevent="selectSuggestion(item)"
             >
-              <span class="suggestion-icon">🔍</span>
+              <span class="suggestion-index">{{ item.type }}</span>
               <span>{{ item.text }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Right Side Utility & Profile Menu -->
-        <div class="play-header-actions">
-          <!-- Dark / Light Theme Toggle -->
-          <button class="icon-circle-btn" @click="toggleTheme" title="다크/라이트 테마 전환">
-            {{ currentTheme === 'dark' ? '☀️' : '🌙' }}
+        <div class="masthead-actions">
+          <button class="icon-square-btn" @click="toggleTheme" title="다크/라이트 테마 전환" aria-label="테마 전환">
+            <svg v-if="currentTheme === 'dark'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>
           </button>
 
-          <!-- Help / Documentation -->
-          <NuxtLink to="/support/report" class="icon-circle-btn" title="보안 검역 및 고객 신고">
-            ❓
+          <NuxtLink to="/support/report" class="icon-square-btn" title="보안 검역 및 고객 신고" aria-label="신고하기">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H7l-3 3V4z" /></svg>
           </NuxtLink>
 
-          <!-- User Google Play Style Avatar & Dropdown -->
           <div class="user-profile-menu-container">
             <button class="user-avatar-btn" @click="profileMenuOpen = !profileMenuOpen" title="계정 및 서비스 전환">
-              <span class="avatar-letter">BN</span>
+              <span class="avatar-letter">{{ loggedIn ? (profileName || 'U').slice(0, 1).toUpperCase() : 'BN' }}</span>
             </button>
 
-            <!-- Profile Popover Modal (Google Style) -->
             <div v-if="profileMenuOpen" class="user-profile-popover" @click.stop>
               <div v-if="loggedIn" class="popover-header">
                 <div class="popover-avatar">{{ (profileName || 'U').slice(0, 1).toUpperCase() }}</div>
@@ -154,36 +125,34 @@
                 <div class="popover-user-info">
                   <div class="popover-name">로그인이 필요합니다</div>
                   <NuxtLink to="/account/login" class="popover-item" @click="profileMenuOpen = false">
-                    <span class="popover-item-icon">🔑</span> 로그인 / 회원가입
+                    로그인 / 회원가입
                   </NuxtLink>
                 </div>
               </div>
 
               <div v-if="loggedIn" class="popover-section">
                 <NuxtLink to="/account/library" class="popover-item" @click="profileMenuOpen = false">
-                  <span class="popover-item-icon">📦</span> 내 앱 및 게임 (보관함)
+                  내 앱 및 게임 (보관함)
                 </NuxtLink>
                 <NuxtLink to="/account/library" class="popover-item" @click="profileMenuOpen = false">
-                  <span class="popover-item-icon">💳</span> 결제 및 정산 내역
+                  결제 및 정산 내역
                 </NuxtLink>
               </div>
 
               <div class="popover-divider"></div>
 
               <div class="popover-section">
-                <div class="popover-section-label">엔터프라이즈 포털 바로가기</div>
+                <div class="popover-section-label">ENTERPRISE PORTAL</div>
                 <a href="/developer/" class="popover-item dev-link">
-                  <span class="popover-item-icon">💻</span>
                   <div class="popover-link-text">
-                    <strong>개발자 콘솔 (Developer Studio)</strong>
+                    <strong>개발자 콘솔</strong>
                     <small>KYB 인증, APK 업로드, 릴리즈 파이프라인</small>
                   </div>
                 </a>
                 <a href="/admin/" class="popover-item admin-link">
-                  <span class="popover-item-icon">⚙️</span>
                   <div class="popover-link-text">
-                    <strong>플랫폼 관리자 (Admin Console)</strong>
-                    <small>4-Eyes 긴급 킬스위치, 실시간 QPS, 심사 큐</small>
+                    <strong>플랫폼 관리자</strong>
+                    <small>긴급 킬스위치, 실시간 QPS, 심사 큐</small>
                   </div>
                 </a>
               </div>
@@ -198,33 +167,31 @@
       </div>
     </header>
 
-    <!-- Store Body Content -->
-    <main class="play-content-area" @click="profileMenuOpen = false">
+    <main class="store-content" @click="profileMenuOpen = false">
       <NuxtPage />
     </main>
 
-    <!-- Google Play Style Clean Footer -->
-    <footer class="play-footer">
-      <div class="play-footer-inner">
-        <div class="play-footer-nav">
+    <footer class="store-footer">
+      <div class="store-footer-inner">
+        <div class="store-footer-nav">
           <div class="footer-col">
-            <h4>Google Play | BookingNetwork</h4>
+            <h4>BookingNetwork App Market</h4>
             <p class="footer-text">
-              독립 앱 유통 생태계를 지원하는 개방형 앱 스토어입니다.
-              구글 플레이 스크래핑을 원천 금지하며 개발사가 서명한 정품 바이너리만을 직접 배포합니다.
+              개발사가 직접 서명한 정품 바이너리만을 유통하는 독립 앱 스토어입니다.
+              비공식 스크래핑을 원천 배제하고 모든 패키지의 서명 연속성을 검증합니다.
             </p>
             <div class="footer-compliance">
-              <span class="compliance-badge">🛡️ EU DMA Article 23 Compliant</span>
-              <span class="compliance-badge">✓ TreeScan Zero-Day Quarantine</span>
+              <span class="compliance-badge">EU DMA ART. 23 COMPLIANT</span>
+              <span class="compliance-badge">TREESCAN QUARANTINE</span>
             </div>
           </div>
 
           <div class="footer-col">
-            <h4>카테고리</h4>
+            <h4>둘러보기</h4>
             <ul>
               <li><a href="#games" @click="switchTopTab('games')">인기 모바일 게임</a></li>
-              <li><a href="#apps" @click="switchTopTab('apps')">생산성 & 비즈니스 앱</a></li>
-              <li><a href="#finance" @click="switchTopTab('apps')">금융 & 자산 관리</a></li>
+              <li><a href="#apps" @click="switchTopTab('apps')">생산성 &amp; 비즈니스 앱</a></li>
+              <li><a href="#finance" @click="switchTopTab('apps')">금융 &amp; 자산 관리</a></li>
               <li><a href="#security" @click="switchTopTab('protect')">보안 및 프라이버시 툴</a></li>
             </ul>
           </div>
@@ -250,8 +217,9 @@
           </div>
         </div>
 
-        <div class="play-footer-bottom">
-          <span>© 2026 Google Play & BookingNetwork Inc. All rights reserved. Sovereign Independent App Market.</span>
+        <div class="store-footer-bottom">
+          <span>© 2026 BookingNetwork Inc. — Sovereign Independent App Market.</span>
+          <span class="footer-build">V3 SIGNATURE CONTINUITY · TREESCAN PIPELINE</span>
         </div>
       </div>
     </footer>
@@ -266,7 +234,7 @@ import { getSharedClient, clearSession, type SuggestionItem } from '@bookingnetw
 const api = getSharedClient()
 const router = useRouter()
 const showSmartBanner = ref(true)
-const currentTheme = ref<'light' | 'dark'>('dark')
+const currentTheme = ref<'light' | 'dark'>('light')
 const activeTopTab = ref<'games' | 'apps' | 'charts' | 'editors' | 'protect'>('apps')
 const searchQuery = ref('')
 const searchFocused = ref(false)
@@ -322,7 +290,6 @@ function signOut() {
 
 function switchTopTab(tab: 'games' | 'apps' | 'charts' | 'editors' | 'protect') {
   activeTopTab.value = tab
-  // Emit or update URL / store section scroll
   const el = document.getElementById(`section-${tab}`)
   if (el) {
     el.scrollIntoView({ behavior: 'smooth' })
@@ -360,11 +327,7 @@ function toggleTheme() {
 onMounted(() => {
   if (typeof window !== 'undefined') {
     const saved = localStorage.getItem('bn_theme') as 'light' | 'dark' | null
-    if (saved) {
-      currentTheme.value = saved
-    } else {
-      currentTheme.value = 'dark'
-    }
+    currentTheme.value = saved === 'dark' ? 'dark' : 'light'
     document.documentElement.setAttribute('data-theme', currentTheme.value)
   }
   void refreshProfile()
@@ -372,597 +335,490 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* ==========================================================================
-   Google Play Store & Apple App Store Theme Stylesheet
-   ========================================================================== */
-
-.bn-playstore-root {
+.bn-store-root {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background-color: var(--bn-bg-canvas);
   color: var(--bn-text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Google Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  transition: background-color 0.2s ease, color 0.2s ease;
-  -webkit-font-smoothing: antialiased;
 }
 
-/* Light / Dark Mode Play Store Palette */
-[data-theme="light"] {
-  --play-bg: #FFFFFF;
-  --play-subtle-bg: #F8F9FA;
-  --play-border: #E0E0E0;
-  --play-text-primary: #202124;
-  --play-text-secondary: #5F6368;
-  --play-accent: #01875F; /* Google Play Emerald Green */
-  --play-accent-hover: #017250;
-  --play-card-bg: #FFFFFF;
-  --play-pill-bg: #E8F0FE;
-  --play-pill-text: #1A73E8;
-  --play-shadow: 0 1px 3px rgba(60,64,67,0.15), 0 1px 2px rgba(60,64,67,0.08);
-  --play-hover-shadow: 0 8px 24px rgba(60,64,67,0.15);
+/* Companion band: solid ink strip */
+.companion-band {
+  background-color: var(--bn-ink);
+  color: var(--bn-bg-canvas);
 }
-
-[data-theme="dark"] {
-  --play-bg: #1F1F1F;
-  --play-subtle-bg: #131314;
-  --play-border: #3C4043;
-  --play-text-primary: #E8EAED;
-  --play-text-secondary: #9AA0A6;
-  --play-accent: #00A870; /* Vibrant Dark Mode Green */
-  --play-accent-hover: #00BD7E;
-  --play-card-bg: #28292A;
-  --play-pill-bg: #004D40;
-  --play-pill-text: #80CBC4;
-  --play-shadow: 0 2px 6px rgba(0,0,0,0.4);
-  --play-hover-shadow: 0 10px 30px rgba(0,0,0,0.6);
-}
-
-/* Smart Companion Banner */
-.smart-companion-banner {
-  background: linear-gradient(90deg, #0d3826 0%, #122820 100%);
-  border-bottom: 1px solid rgba(1, 135, 95, 0.4);
-  padding: 8px 16px;
-  position: relative;
-  z-index: 1001;
-}
-
-.banner-inner {
+.band-inner {
   max-width: 1360px;
   margin: 0 auto;
+  padding: 8px 24px;
   display: flex;
   align-items: center;
   gap: 12px;
 }
-
-.banner-close {
+.band-close {
   background: transparent;
   border: none;
-  color: #9AA0A6;
-  font-size: 14px;
+  color: inherit;
+  opacity: 0.6;
   cursor: pointer;
   padding: 4px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: color 0.15s;
 }
-
-.banner-close:hover {
-  color: #fff;
+.band-close:hover {
+  opacity: 1;
 }
-
-.banner-icon {
-  width: 32px;
-  height: 32px;
-  background: rgba(1, 135, 95, 0.2);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+.band-kicker {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  border: 1px solid currentColor;
+  border-radius: var(--bn-radius-sm);
+  padding: 2px 6px;
+  opacity: 0.8;
+  white-space: nowrap;
 }
-
 .banner-text {
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: 10px;
   flex: 1;
+  min-width: 0;
   font-size: 12px;
-  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
 }
-
 .banner-text strong {
-  color: #E8EAED;
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 700;
 }
-
 .banner-text span {
-  color: #9AA0A6;
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-
 .banner-download-btn {
-  background-color: var(--play-accent);
-  color: #ffffff;
+  background-color: var(--bn-bg-canvas);
+  color: var(--bn-ink);
   border: none;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   padding: 6px 14px;
-  border-radius: 18px;
+  border-radius: var(--bn-radius-sm);
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.15s, transform 0.1s;
 }
-
 .banner-download-btn:hover {
-  background-color: var(--play-accent-hover);
-  transform: translateY(-1px);
+  opacity: 0.88;
 }
 
-/* Header Navbar */
-.play-header {
+/* Masthead */
+.masthead {
   position: sticky;
   top: 0;
   z-index: 1000;
-  background-color: var(--play-bg);
-  border-bottom: 1px solid var(--play-border);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  backdrop-filter: blur(10px);
+  background-color: var(--bn-bg-canvas);
+  border-bottom: 1px solid var(--bn-border-subtle);
 }
-
-.play-header-container {
+.masthead-inner {
   max-width: 1360px;
-  height: 64px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 12px 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
+  gap: 28px;
 }
-
-/* Brand Logo */
-.play-logo {
+.wordmark {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   text-decoration: none;
+  color: inherit;
   flex-shrink: 0;
 }
-
-.play-logo-icon {
-  display: flex;
+.seal-mark {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 34px;
+  height: 34px;
+  background-color: var(--bn-seal);
+  color: #fff;
+  font-family: var(--bn-font-display);
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  border-radius: var(--bn-radius-sm);
 }
-
-.play-logo-text {
+.wordmark-text {
   display: flex;
   flex-direction: column;
+  line-height: 1.15;
 }
-
 .brand-name {
-  font-size: 19px;
-  font-weight: 700;
-  color: var(--play-text-primary);
-  letter-spacing: -0.4px;
+  font-family: var(--bn-font-display);
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.02em;
 }
-
-.brand-partner {
-  font-weight: 400;
-  color: var(--play-text-secondary);
-  font-size: 15px;
-}
-
 .brand-sub {
-  font-size: 11px;
+  font-family: var(--bn-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--bn-text-muted);
+}
+.masthead-tabs {
+  display: flex;
+  gap: 2px;
+}
+.top-tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--bn-text-secondary);
+  font-family: var(--bn-font-sans);
+  font-size: 14px;
   font-weight: 600;
-  color: var(--play-accent);
-  letter-spacing: 0.5px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.top-tab-btn:hover {
+  color: var(--bn-text-primary);
+}
+.top-tab-btn.active {
+  color: var(--bn-text-primary);
+  border-bottom-color: var(--bn-seal);
 }
 
-/* Top Play Tabs (Google Play Style Center Navigation) */
-.play-top-tabs {
+/* Search */
+.masthead-search {
+  position: relative;
+  flex: 1;
+  max-width: 380px;
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
+  background-color: var(--bn-bg-well);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  padding: 0 10px;
 }
-
-.top-tab-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: none;
-  color: var(--play-text-secondary);
-  font-size: 14px;
-  font-weight: 600;
-  padding: 8px 16px;
-  border-radius: 9999px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+.masthead-search.focused {
+  border-color: var(--bn-border-strong);
+  background-color: var(--bn-bg-surface);
 }
-
-.top-tab-btn:hover {
-  background-color: var(--play-subtle-bg);
-  color: var(--play-text-primary);
-}
-
-.top-tab-btn.active {
-  background-color: var(--play-pill-bg);
-  color: var(--play-pill-text);
-  font-weight: 700;
-}
-
-/* Search Bar (Capsule Google Play Style) */
-.play-search-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-  background-color: var(--play-subtle-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 9999px;
-  padding: 0 16px;
-  height: 44px;
-  flex: 1;
-  max-width: 380px;
-  transition: all 0.2s ease;
-}
-
-.play-search-box.focused {
-  background-color: var(--play-bg);
-  border-color: var(--play-accent);
-  box-shadow: 0 0 0 3px rgba(1, 135, 95, 0.2);
-}
-
 .search-svg {
-  color: var(--play-text-secondary);
-  margin-right: 10px;
+  color: var(--bn-text-muted);
   flex-shrink: 0;
 }
-
 .search-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   outline: none;
-  font-size: 14px;
-  color: var(--play-text-primary);
+  color: var(--bn-text-primary);
+  font-family: var(--bn-font-sans);
+  font-size: 13px;
+  padding: 9px 0;
 }
-
+.search-input::placeholder {
+  color: var(--bn-text-muted);
+}
 .search-clear-btn {
   background: none;
   border: none;
-  color: var(--play-text-secondary);
+  color: var(--bn-text-muted);
   cursor: pointer;
-  font-size: 13px;
+  display: flex;
   padding: 4px;
 }
-
+.search-clear-btn:hover {
+  color: var(--bn-text-primary);
+}
 .search-suggestions-dropdown {
   position: absolute;
-  top: 50px;
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
-  background-color: var(--play-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 16px;
-  box-shadow: var(--play-hover-shadow);
-  padding: 12px 0;
-  z-index: 1010;
+  background-color: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  box-shadow: var(--bn-shadow-pop);
+  overflow: hidden;
+  z-index: 1001;
 }
-
 .suggestions-label {
-  padding: 4px 18px 8px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--play-text-secondary);
-  text-transform: uppercase;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--bn-text-muted);
+  padding: 8px 12px 4px;
 }
-
 .suggestion-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
-  font-size: 14px;
-  color: var(--play-text-primary);
-  cursor: pointer;
-  transition: background-color 0.1s ease;
-}
-
-.suggestion-item:hover {
-  background-color: var(--play-subtle-bg);
-}
-
-/* Header Action Buttons */
-.play-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  position: relative;
-}
-
-.icon-circle-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: 1px solid var(--play-border);
-  background-color: var(--play-subtle-bg);
-  color: var(--play-text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  cursor: pointer;
-  text-decoration: none;
-  transition: all 0.15s ease;
-}
-
-.icon-circle-btn:hover {
-  background-color: var(--play-border);
-}
-
-/* User Avatar & Popover (Google Play Account Style) */
-.user-avatar-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: 2px solid var(--play-accent);
-  background: linear-gradient(135deg, #0084FF, #00E575);
-  color: #FFFFFF;
+  gap: 10px;
+  padding: 8px 12px;
   font-size: 13px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-  transition: transform 0.15s ease;
+}
+.suggestion-item:hover {
+  background-color: var(--bn-bg-well);
+}
+.suggestion-index {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  color: var(--bn-text-muted);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  padding: 1px 5px;
 }
 
-.user-avatar-btn:hover {
-  transform: scale(1.05);
-}
-
-.user-profile-popover {
-  position: absolute;
-  top: 50px;
-  right: 0;
-  width: 340px;
-  background-color: var(--play-bg);
-  border: 1px solid var(--play-border);
-  border-radius: 20px;
-  box-shadow: var(--play-hover-shadow);
-  padding: 20px;
-  z-index: 1050;
-  display: flex;
-  flex-direction: column;
-}
-
-.popover-header {
+/* Header actions + profile */
+.masthead-actions {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--play-border);
-}
-
-.popover-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #0084FF, #00E575);
-  color: white;
-  font-size: 16px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  gap: 8px;
   flex-shrink: 0;
 }
-
-.popover-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--play-text-primary);
-}
-
-.popover-email {
-  font-size: 13px;
-  color: var(--play-text-secondary);
-}
-
-.popover-badge {
-  display: inline-block;
-  margin-top: 4px;
-  padding: 2px 8px;
-  background-color: rgba(1, 135, 95, 0.15);
-  color: var(--play-accent);
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 9999px;
-}
-
-.popover-section {
-  display: flex;
-  flex-direction: column;
-  padding: 12px 0;
-  gap: 4px;
-}
-
-.popover-section-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--play-text-secondary);
-  text-transform: uppercase;
-  margin-bottom: 6px;
-  padding: 0 8px;
-}
-
-.popover-item {
-  display: flex;
+.icon-square-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  color: var(--play-text-primary);
-  text-decoration: none;
-  font-size: 13px;
-  font-weight: 600;
-  transition: background-color 0.15s ease;
-}
-
-.popover-item:hover {
-  background-color: var(--play-subtle-bg);
-}
-
-.popover-link-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.popover-link-text strong {
-  font-size: 13px;
-}
-
-.popover-link-text small {
-  font-size: 11px;
-  color: var(--play-text-secondary);
-  font-weight: 400;
-}
-
-.popover-divider {
-  height: 1px;
-  background-color: var(--play-border);
-  margin: 4px 0;
-}
-
-.popover-footer {
-  padding-top: 12px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.popover-signout-btn {
+  justify-content: center;
+  width: 34px;
+  height: 34px;
   background: transparent;
-  border: 1px solid var(--play-border);
-  border-radius: 8px;
-  color: var(--play-text-secondary);
-  padding: 6px 14px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  color: var(--bn-text-secondary);
+  cursor: pointer;
+  text-decoration: none;
+}
+.icon-square-btn:hover {
+  color: var(--bn-text-primary);
+  border-color: var(--bn-border-strong);
+}
+.user-profile-menu-container {
+  position: relative;
+}
+.user-avatar-btn {
+  width: 34px;
+  height: 34px;
+  background-color: var(--bn-ink);
+  color: var(--bn-bg-canvas);
+  border: none;
+  border-radius: var(--bn-radius-sm);
+  font-family: var(--bn-font-display);
+  font-weight: 800;
   font-size: 12px;
-  font-weight: 600;
   cursor: pointer;
 }
-
+.avatar-letter {
+  letter-spacing: 0.02em;
+}
+.user-profile-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  background-color: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
+  box-shadow: var(--bn-shadow-pop);
+  z-index: 1002;
+}
+.popover-header {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  align-items: center;
+}
+.popover-avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bn-ink);
+  color: var(--bn-bg-canvas);
+  font-family: var(--bn-font-display);
+  font-weight: 800;
+  font-size: 15px;
+  border-radius: var(--bn-radius-sm);
+}
+.popover-user-info {
+  min-width: 0;
+}
+.popover-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+.popover-email {
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  color: var(--bn-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.popover-section {
+  padding: 6px;
+}
+.popover-item {
+  display: block;
+  padding: 9px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bn-text-primary);
+  text-decoration: none;
+  border-radius: var(--bn-radius-sm);
+}
+.popover-item:hover {
+  background-color: var(--bn-bg-well);
+}
+.popover-link-text strong {
+  display: block;
+  font-size: 13px;
+}
+.popover-link-text small {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--bn-text-muted);
+  margin-top: 2px;
+}
+.popover-divider {
+  border-top: 1px solid var(--bn-border-subtle);
+  margin: 4px 0;
+}
+.popover-section-label {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--bn-text-muted);
+  padding: 6px 10px 2px;
+}
+.popover-footer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 14px;
+}
+.popover-signout-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  color: var(--bn-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 0;
+  cursor: pointer;
+}
 .popover-signout-btn:hover {
-  background-color: var(--play-subtle-bg);
-  color: var(--play-text-primary);
+  border-color: var(--bn-border-strong);
+  color: var(--bn-text-primary);
 }
 
-/* Page Body */
-.play-content-area {
+/* Content + footer */
+.store-content {
   flex: 1;
 }
-
-/* Footer (Clean Google Style) */
-.play-footer {
-  background-color: var(--play-subtle-bg);
-  border-top: 1px solid var(--play-border);
-  padding: 48px 24px 24px;
-  margin-top: 60px;
+.store-footer {
+  border-top: 1px solid var(--bn-border-subtle);
+  margin-top: 40px;
 }
-
-.play-footer-inner {
+.store-footer-inner {
   max-width: 1360px;
   margin: 0 auto;
+  padding: 36px 24px 24px;
 }
-
-.play-footer-nav {
+.store-footer-nav {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1.2fr;
-  gap: 40px;
-  margin-bottom: 36px;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 32px;
 }
-
 .footer-col h4 {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--play-text-primary);
-  margin-bottom: 16px;
-}
-
-.footer-text {
+  font-family: var(--bn-font-display);
   font-size: 13px;
-  line-height: 1.6;
-  color: var(--play-text-secondary);
-  margin-bottom: 16px;
-  max-width: 420px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  margin: 0 0 12px;
 }
-
+.footer-text {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--bn-text-secondary);
+  margin: 0 0 14px;
+}
 .footer-compliance {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-
 .compliance-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  background-color: rgba(1, 135, 95, 0.12);
-  color: var(--play-accent);
-  border: 1px solid rgba(1, 135, 95, 0.3);
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-seal);
+  border: 1px solid var(--bn-seal);
+  border-radius: var(--bn-radius-sm);
+  padding: 3px 8px;
 }
-
 .footer-col ul {
   list-style: none;
-  padding: 0;
   margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
-
 .footer-col a {
-  color: var(--play-text-secondary);
-  text-decoration: none;
   font-size: 13px;
-  transition: color 0.15s ease;
+  color: var(--bn-text-secondary);
+  text-decoration: none;
 }
-
 .footer-col a:hover {
-  color: var(--play-accent);
+  color: var(--bn-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.store-footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--bn-border-subtle);
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  color: var(--bn-text-muted);
 }
 
-.play-footer-bottom {
-  padding-top: 24px;
-  border-top: 1px solid var(--play-border);
-  font-size: 12px;
-  color: var(--play-text-secondary);
-  text-align: center;
-}
-
-/* Responsive adjustments */
 @media (max-width: 1024px) {
-  .play-top-tabs {
-    display: none;
+  .masthead-inner {
+    flex-wrap: wrap;
+    gap: 12px;
   }
-  .play-footer-nav {
+  .masthead-tabs {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+  }
+  .masthead-search {
+    margin-left: 0;
+    flex: 1;
+  }
+  .store-footer-nav {
     grid-template-columns: 1fr 1fr;
   }
 }
-
 @media (max-width: 640px) {
-  .play-header-container {
-    padding: 0 16px;
-  }
-  .brand-sub, .brand-partner {
+  .banner-text span {
     display: none;
   }
-  .play-footer-nav {
+  .store-footer-nav {
     grid-template-columns: 1fr;
   }
 }

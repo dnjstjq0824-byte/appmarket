@@ -33,10 +33,12 @@
       <div class="bn-trust-item">
         <label>요구 권한 위험도 점수</label>
         <div v-if="riskScore !== undefined" class="bn-risk-bar-container">
-          <div
-            class="bn-risk-bar"
-            :style="{ width: Math.min(riskScore, 100) + '%', backgroundColor: riskBarColor }"
-          ></div>
+          <div class="bn-risk-track">
+            <div
+              class="bn-risk-bar"
+              :style="{ width: Math.min(riskScore, 100) + '%', backgroundColor: riskBarColor }"
+            ></div>
+          </div>
           <span class="bn-risk-text">{{ riskScore }}/100</span>
         </div>
         <span v-else class="bn-scan-result">미평가</span>
@@ -109,9 +111,10 @@ const riskBarColor = computed(() => {
 
 <style scoped>
 .bn-trust-card {
-  background-color: var(--bn-bg-surface, #FFFFFF);
-  border: 1px solid var(--bn-border-subtle, #E2E8F0);
-  border-radius: 12px;
+  background-color: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-left: 3px solid var(--bn-seal);
+  border-radius: var(--bn-radius-md);
   padding: 20px;
   margin: 20px 0;
 }
@@ -120,25 +123,31 @@ const riskBarColor = computed(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--bn-border-subtle);
   flex-wrap: wrap;
   gap: 10px;
 }
 .bn-trust-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-weight: 600;
+  gap: 8px;
+  font-weight: 700;
   font-size: 14px;
 }
 .bn-trust-badge.status-clean, .bn-trust-badge.status-clean_low_risk {
-  color: var(--bn-trust-verified, #059669);
+  color: var(--bn-trust-verified);
 }
 .bn-trust-badge.status-infected_quarantined {
-  color: var(--bn-danger-red, #DC2626);
+  color: var(--bn-danger-red);
 }
 .bn-distribution-tag {
-  font-size: 13px;
-  color: var(--bn-text-muted, #64748B);
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  color: var(--bn-text-muted);
+}
+.bn-distribution-tag strong {
+  color: var(--bn-text-secondary);
 }
 .bn-trust-grid {
   display: grid;
@@ -147,41 +156,51 @@ const riskBarColor = computed(() => {
 }
 .bn-trust-item label {
   display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--bn-text-muted, #64748B);
-  margin-bottom: 6px;
-  text-transform: uppercase;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
+  margin-bottom: 8px;
 }
 .bn-scan-result {
   font-size: 14px;
-  color: var(--bn-text-secondary, #334155);
+  color: var(--bn-text-secondary);
 }
 .bn-risk-bar-container {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+.bn-risk-track {
+  flex: 1;
+  min-width: 120px;
+  height: 6px;
+  background-color: var(--bn-bg-well);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  overflow: hidden;
 }
 .bn-risk-bar {
-  height: 8px;
-  border-radius: 4px;
-  transition: width 0.3s ease;
+  height: 100%;
 }
 .bn-risk-text {
-  font-size: 13px;
+  font-family: var(--bn-font-mono);
+  font-size: 12px;
   font-weight: 600;
-  color: var(--bn-text-secondary, #334155);
+  color: var(--bn-text-secondary);
 }
 .bn-external-notice {
   margin-top: 16px;
-  padding: 10px 14px;
-  background-color: var(--bn-bg-elevated, #F1F5F9);
-  border-radius: 8px;
+  padding: 12px 14px;
+  background-color: var(--bn-bg-well);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 13px;
-  color: var(--bn-text-secondary, #334155);
+  line-height: 1.6;
+  color: var(--bn-text-secondary);
 }
 .bn-icon {
   width: 18px;

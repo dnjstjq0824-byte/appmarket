@@ -20,9 +20,9 @@
     </div>
 
     <!-- KYB Gate Alert if not verified -->
-    <div v-if="kybStatus !== 'VERIFIED'" class="kyb-gate-banner" style="background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; color: #fbbf24; font-size: 13px;">
+    <div v-if="kybStatus !== 'VERIFIED'" class="kyb-gate-banner">
       <strong>조직 KYB 미검증 상태 (업로드 제한)</strong>
-      <p style="margin-top: 4px; color: #d1d5db;">보안 규정에 따라 법인 신원 검증(KYB)이 완료되지 않은 조직은 릴리스 바이너리를 업로드할 수 없습니다. <router-link to="/" style="color: #60a5fa; text-decoration: underline;">[조직 & KYB 인증]</router-link> 페이지에서 서류를 제출해 주십시오.</p>
+      <p>보안 규정에 따라 법인 신원 검증(KYB)이 완료되지 않은 조직은 릴리스 바이너리를 업로드할 수 없습니다. <router-link to="/">[조직 & KYB 인증]</router-link> 페이지에서 서류를 제출해 주십시오.</p>
     </div>
 
     <!-- Drop Zone -->
@@ -42,7 +42,7 @@
         :disabled="uploadState === 'UPLOADING' || uploadState === 'HASHING' || kybStatus !== 'VERIFIED'"
       />
       <label for="fileInput" class="dropzone-label">
-        <div class="drop-icon" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg></div>
+        <div class="drop-icon" aria-hidden="true"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M4 21h16" /></svg></div>
         <div v-if="!selectedFile" class="prompt-text">
           <strong>Drag & Drop APK or AAB bundle here</strong>
           <span>or click to browse from local computer (Max: 4GB)</span>
@@ -71,7 +71,7 @@
 
     <!-- Validation Error Alert -->
     <div v-if="errorMessage" class="alert alert-error">
-      <div class="alert-icon" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
+      <div class="alert-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
       <div class="alert-content">
         <h4>{{ errorCode || 'Validation Error' }}</h4>
         <p>{{ errorMessage }}</p>
@@ -355,17 +355,25 @@ function formatFileSize(bytes: number): string {
 
 <style scoped>
 .apk-uploader-view {
-  padding: 24px;
-  max-width: 900px;
+  max-width: 920px;
   margin: 0 auto;
-  font-family: inherit;
 }
 .view-header {
   margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--bn-ink);
+}
+.view-header h2 {
+  font-family: var(--bn-font-display);
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
 }
 .subtitle {
-  color: #64748b;
-  font-size: 14px;
+  color: var(--bn-text-secondary);
+  font-size: 13px;
+  margin: 0;
 }
 .org-row {
   display: flex;
@@ -373,136 +381,220 @@ function formatFileSize(bytes: number): string {
   gap: 10px;
   margin-bottom: 16px;
   font-size: 13px;
+  color: var(--bn-text-secondary);
+}
+.org-row label {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
 }
 .org-row select {
   padding: 8px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
   font-size: 13px;
-  background: white;
+  background: var(--bn-bg-surface);
+  color: var(--bn-text-primary);
+  font-family: var(--bn-font-sans);
+}
+.kyb-gate-banner {
+  background: var(--bn-warning-wash);
+  border: 1px solid var(--bn-warning-amber);
+  border-radius: var(--bn-radius-md);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.kyb-gate-banner strong {
+  color: var(--bn-warning-amber);
+}
+.kyb-gate-banner p {
+  margin: 6px 0 0;
+  color: var(--bn-text-secondary);
+  line-height: 1.6;
+}
+.kyb-gate-banner a {
+  color: var(--bn-text-primary);
+  font-weight: 700;
 }
 .upload-dropzone {
-  border: 2px dashed #cbd5e1;
-  border-radius: 8px;
-  padding: 40px;
+  border: 1px dashed var(--bn-border-strong);
+  border-radius: var(--bn-radius-md);
+  padding: 44px 24px;
   text-align: center;
-  background: #f8fafc;
+  background: var(--bn-bg-surface);
   cursor: pointer;
-  transition: all 0.2s;
 }
 .upload-dropzone.dragging {
-  border-color: #3b82f6;
-  background: #eff6ff;
+  border-color: var(--bn-seal);
+  border-style: solid;
+}
+.upload-dropzone.has-file {
+  border-style: solid;
+  border-color: var(--bn-trust-verified);
+}
+.upload-dropzone.disabled-zone {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .hidden-file-input {
   display: none;
 }
+.dropzone-label {
+  display: block;
+  cursor: pointer;
+}
+.disabled-zone .dropzone-label {
+  cursor: not-allowed;
+}
 .drop-icon {
-  font-size: 40px;
+  color: var(--bn-text-muted);
   margin-bottom: 12px;
+}
+.dragging .drop-icon {
+  color: var(--bn-seal);
+}
+.has-file .drop-icon {
+  display: none;
 }
 .prompt-text strong {
   display: block;
-  font-size: 16px;
+  font-size: 15px;
   margin-bottom: 4px;
 }
 .prompt-text span {
   font-size: 13px;
-  color: #64748b;
+  color: var(--bn-text-muted);
 }
 .selected-file-info {
   font-weight: 600;
-  color: #1e293b;
+  font-size: 14px;
+}
+.file-size {
+  font-family: var(--bn-font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--bn-text-muted);
 }
 .progress-section {
   margin-top: 20px;
-  background: white;
-  padding: 16px;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  background: var(--bn-bg-surface);
+  padding: 18px;
+  border-radius: var(--bn-radius-md);
+  border: 1px solid var(--bn-border-subtle);
 }
 .progress-labels {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 12px;
+  margin-bottom: 10px;
   font-size: 13px;
-  font-weight: 500;
+}
+.progress-labels span:last-child {
+  font-family: var(--bn-font-mono);
+  color: var(--bn-text-secondary);
 }
 .progress-track {
-  height: 8px;
-  background: #e2e8f0;
-  border-radius: 4px;
+  height: 6px;
+  background: var(--bn-bg-well);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
   overflow: hidden;
 }
 .progress-bar {
   height: 100%;
-  background: #3b82f6;
-  transition: width 0.2s ease;
+  background: var(--bn-ink);
 }
 .upload-stats {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
+  gap: 12px;
+  margin-top: 12px;
   font-size: 12px;
+  color: var(--bn-text-secondary);
+}
+.upload-stats code {
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+.alert {
+  border-radius: var(--bn-radius-md);
 }
 .alert-error {
   margin-top: 20px;
-  padding: 16px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 6px;
+  padding: 18px;
+  background: var(--bn-danger-wash);
+  border: 1px solid var(--bn-danger-red);
   display: flex;
   gap: 16px;
   align-items: flex-start;
 }
 .alert-icon {
-  font-size: 24px;
+  color: var(--bn-danger-red);
+  flex-shrink: 0;
+}
+.alert-content {
+  flex: 1;
 }
 .alert-content h4 {
   margin: 0 0 6px 0;
-  color: #991b1b;
+  font-size: 14px;
+  color: var(--bn-danger-red);
 }
 .alert-content p {
   margin: 0;
-  color: #7f1d1d;
-  font-size: 14px;
+  color: var(--bn-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
 }
 .guide-box {
   margin-top: 10px;
-  padding: 8px;
-  background: white;
-  border-radius: 4px;
-  border-left: 3px solid #dc2626;
+  padding: 10px 12px;
+  background: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
   font-size: 13px;
+  font-family: var(--bn-font-mono);
 }
 .binary-details-card {
   margin-top: 24px;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  background: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
   padding: 24px;
 }
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--bn-border-subtle);
+  flex-wrap: wrap;
+}
+.card-header h3 {
+  font-family: var(--bn-font-display);
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
 }
 .badge {
   display: inline-block;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
   padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
+  border-radius: var(--bn-radius-sm);
+  border: 1px solid var(--bn-border-strong);
+  color: var(--bn-text-secondary);
 }
 .badge-success {
-  background: #dcfce7;
-  color: #166534;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
+  border-color: var(--bn-trust-verified);
+  color: var(--bn-trust-verified);
 }
 .grid-details {
   display: grid;
@@ -514,74 +606,103 @@ function formatFileSize(bytes: number): string {
   grid-column: span 2;
 }
 .detail-item label {
-  font-size: 12px;
-  color: #64748b;
-  text-transform: uppercase;
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
+  margin-bottom: 6px;
   display: block;
 }
+.detail-item .value {
+  font-size: 14px;
+}
+.font-mono {
+  font-family: var(--bn-font-mono);
+}
 .hash-box {
-  background: #f8fafc;
-  padding: 8px;
-  border-radius: 4px;
+  background: var(--bn-bg-well);
+  border: 1px solid var(--bn-border-subtle);
+  padding: 10px 12px;
+  border-radius: var(--bn-radius-sm);
   word-break: break-all;
   font-size: 12px;
 }
 .permissions-section {
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--bn-border-subtle);
   padding-top: 16px;
   margin-bottom: 20px;
+}
+.permissions-section h4 {
+  font-size: 13px;
+  margin: 0;
 }
 .perm-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 8px 0;
+  margin: 10px 0;
 }
 .tag-warning {
-  background: #fef3c7;
-  color: #92400e;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 12px;
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  border: 1px solid var(--bn-warning-amber);
+  color: var(--bn-warning-amber);
+  padding: 3px 9px;
+  border-radius: var(--bn-radius-sm);
 }
 .perm-notice {
   font-size: 12px;
-  color: #64748b;
+  color: var(--bn-text-muted);
   margin: 4px 0 0;
 }
 .card-actions {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--bn-border-subtle);
   padding-top: 16px;
 }
 .btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 500;
+  padding: 9px 18px;
+  border-radius: var(--bn-radius-sm);
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  border: none;
 }
 .btn-primary {
-  background: #2563eb;
-  color: white;
+  background: var(--bn-action-bg);
+  color: var(--bn-action-text);
+  border: none;
+}
+.btn-primary:hover {
+  background: var(--bn-action-bg-hover);
 }
 .btn-secondary {
-  background: #f1f5f9;
-  color: #334155;
+  background: transparent;
+  border: 1px solid var(--bn-border-subtle);
+  color: var(--bn-text-secondary);
+}
+.btn-secondary:hover {
+  border-color: var(--bn-border-strong);
+  color: var(--bn-text-primary);
 }
 .btn-outline {
-  border: 1px solid #dc2626;
+  border: 1px solid var(--bn-danger-red);
   background: transparent;
-  color: #dc2626;
+  color: var(--bn-danger-red);
+  flex-shrink: 0;
 }
 .btn-sm {
-  padding: 4px 10px;
+  padding: 5px 12px;
   font-size: 12px;
+}
+@media (max-width: 640px) {
+  .grid-details {
+    grid-template-columns: 1fr;
+  }
+  .col-span-2 {
+    grid-column: span 1;
+  }
 }
 </style>
 

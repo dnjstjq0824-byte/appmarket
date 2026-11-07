@@ -151,8 +151,28 @@ async function removeMember(userId: string) {
 
 <style scoped>
 .bn-dev-page {
-  padding: 24px;
-  max-width: 900px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+.bn-page-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--bn-ink);
+}
+.bn-page-header h2 {
+  font-family: var(--bn-font-display);
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+.bn-text-muted {
+  color: var(--bn-text-secondary);
+  font-size: 13px;
+  margin: 0;
+}
+td.bn-text-muted {
+  font-size: 13px;
 }
 .bn-org-row {
   display: flex;
@@ -160,31 +180,42 @@ async function removeMember(userId: string) {
   gap: 10px;
   margin-bottom: 16px;
   font-size: 13px;
+  color: var(--bn-text-secondary);
+}
+.bn-org-row label {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
+  flex-shrink: 0;
 }
 .bn-loading {
-  padding: 16px;
-  color: var(--bn-text-muted, #64748B);
+  padding: 24px;
+  color: var(--bn-text-muted);
   font-size: 14px;
+  text-align: center;
 }
 .bn-error {
   padding: 12px 16px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
-  border-radius: 6px;
+  background: var(--bn-danger-wash);
+  border: 1px solid var(--bn-danger-red);
+  color: var(--bn-danger-red);
+  border-radius: var(--bn-radius-sm);
   font-size: 13px;
   margin-bottom: 16px;
 }
 .bn-empty {
-  padding: 24px;
+  padding: 28px 24px;
   text-align: center;
-  color: var(--bn-text-muted, #64748B);
+  color: var(--bn-text-muted);
   font-size: 14px;
+  border: 1px dashed var(--bn-border-strong);
+  border-radius: var(--bn-radius-md);
 }
 .bn-form-card {
-  background-color: var(--bn-bg-surface, #FFFFFF);
-  border: 1px solid var(--bn-border-subtle, #E2E8F0);
-  border-radius: 12px;
+  background-color: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
   padding: 24px;
 }
 .bn-invite-bar {
@@ -196,23 +227,48 @@ async function removeMember(userId: string) {
 .bn-input {
   flex: 1;
   min-width: 240px;
-  padding: 10px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--bn-border-subtle, #E2E8F0);
+  padding: 10px 12px;
+  border-radius: var(--bn-radius-sm);
+  border: 1px solid var(--bn-border-subtle);
+  background: var(--bn-bg-surface);
+  color: var(--bn-text-primary);
+  font-family: var(--bn-font-sans);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.bn-input:focus {
+  outline: none;
+  border-color: var(--bn-ink);
 }
 .bn-select {
-  padding: 10px 14px;
-  border-radius: 6px;
-  border: 1px solid var(--bn-border-subtle, #E2E8F0);
+  padding: 10px 12px;
+  border-radius: var(--bn-radius-sm);
+  border: 1px solid var(--bn-border-subtle);
+  background: var(--bn-bg-surface);
+  color: var(--bn-text-primary);
+  font-family: var(--bn-font-sans);
+  font-size: 13px;
+}
+.bn-btn {
+  font-family: var(--bn-font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
 }
 .bn-btn-primary {
-  background-color: var(--bn-primary, #2563EB);
-  color: white;
+  background-color: var(--bn-action-bg);
+  color: var(--bn-action-text);
   border: none;
   padding: 10px 20px;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
+  border-radius: var(--bn-radius-sm);
+}
+.bn-btn-primary:hover:not(:disabled) {
+  background-color: var(--bn-action-bg-hover);
+}
+.bn-btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .bn-table {
   width: 100%;
@@ -221,24 +277,46 @@ async function removeMember(userId: string) {
 .bn-table th, .bn-table td {
   padding: 12px;
   text-align: left;
-  border-bottom: 1px solid var(--bn-border-subtle, #E2E8F0);
-  font-size: 14px;
+  border-bottom: 1px solid var(--bn-border-subtle);
+  font-size: 13px;
+  vertical-align: middle;
+}
+.bn-table tr:last-child td {
+  border-bottom: none;
+}
+.bn-table th {
+  font-family: var(--bn-font-mono);
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
 }
 .bn-role-tag {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  background-color: var(--bn-bg-elevated, #F1F5F9);
-  color: var(--bn-primary, #2563EB);
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: var(--bn-radius-sm);
+  border: 1px solid var(--bn-border-strong);
+  color: var(--bn-text-primary);
+  white-space: nowrap;
 }
 .bn-btn-text-danger {
-  color: var(--bn-danger-red, #DC2626);
+  color: var(--bn-danger-red);
   background: none;
   border: none;
   cursor: pointer;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 0;
+}
+.bn-btn-text-danger:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.bn-btn-text-danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 </style>
 

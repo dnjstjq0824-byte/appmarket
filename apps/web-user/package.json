@@ -7,7 +7,8 @@
     "dev": "nuxt dev",
     "build": "nuxt generate",
     "generate": "nuxt generate",
-    "preview": "nuxt preview"
+    "preview": "nuxt preview",
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@bookingnetwork/ui-kit": "workspace:*",
@@ -16,7 +17,9 @@
     "vue-router": "^4.4.5"
   },
   "devDependencies": {
-    "nuxt": "^3.13.2"
+    "nuxt": "^3.13.2",
+    "typescript": "^5.6.3",
+    "vue-tsc": "^2.1.8"
   }
 }
 

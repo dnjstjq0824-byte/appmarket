@@ -1,50 +1,128 @@
+/* BookingNetwork App Market — "Ledger & Seal" design tokens.
+   Light ledger storefront by default; consoles opt into dark ops-room
+   via data-theme="dark". No gradients, no glow, no blue-button default. */
+
 :root, [data-theme="light"] {
-  /* Surface & Background */
-  --bn-bg-canvas: #F8FAFC;
-  --bn-bg-surface: #FFFFFF;
-  --bn-bg-elevated: #F1F5F9;
-  --bn-border-subtle: #E2E8F0;
+  color-scheme: light;
 
-  /* Text Hierarchy (WCAG AA >= 4.5:1 guaranteed) */
-  --bn-text-primary: #0F172A;
-  --bn-text-secondary: #334155;
-  --bn-text-muted: #64748B;
+  /* Paper & ink */
+  --bn-bg-canvas: #ffffff;
+  --bn-bg-surface: #ffffff;
+  --bn-bg-well: #f4f3ef;
+  --bn-bg-elevated: #eceae3;
+  --bn-border-subtle: #e2ded4;
+  --bn-border-strong: #c9c3b4;
+  --bn-ink: #1a1611;
 
-  /* Brand & Semantic Actions */
-  --bn-primary: #2563EB;
-  --bn-primary-hover: #1D4ED8;
-  --bn-trust-verified: #059669;   /* Direct Verified APK & Clean Signature */
-  --bn-external-link: #4F46E5;    /* External Official Store Outlink */
-  --bn-warning-amber: #D97706;    /* High-Risk Permission / Signer Conflict */
-  --bn-danger-red: #DC2626;       /* Malware Quarantined / Revoked */
+  /* Text (warm ink scale) */
+  --bn-text-primary: #1a1611;
+  --bn-text-secondary: #4a4439;
+  --bn-text-muted: #857c6c;
+
+  /* Primary action: solid ink, paper text */
+  --bn-action-bg: #1a1611;
+  --bn-action-bg-hover: #000000;
+  --bn-action-text: #faf9f6;
+  --bn-primary: #1a1611;
+  --bn-primary-hover: #000000;
+
+  /* The seal: certification red (verified stamps, brand marks) */
+  --bn-seal: #b3261e;
+  --bn-seal-ink: #7f1a14;
+  --bn-seal-wash: #f9e9e7;
+
+  /* Verdicts (security states only) */
+  --bn-trust-verified: #0e7a4d;
+  --bn-trust-wash: #e6f2ea;
+  --bn-external-link: #1a1611;
+  --bn-warning-amber: #8a5a00;
+  --bn-warning-wash: #f7efdc;
+  --bn-danger-red: #a0271f;
+  --bn-danger-wash: #f9e9e7;
+
+  /* Type */
+  --bn-font-sans: "Pretendard Variable", "Pretendard", -apple-system, "BlinkMacSystemFont",
+    "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --bn-font-display: "Archivo", "Pretendard Variable", "Pretendard",
+    "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --bn-font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+
+  /* Shape: small radii, pills only for status chips */
+  --bn-radius-sm: 3px;
+  --bn-radius-md: 6px;
+  --bn-radius-lg: 10px;
+  --bn-radius-pill: 999px;
+
+  /* Shadow: one flat contact shadow, nothing colored */
+  --bn-shadow-card: 0 1px 2px rgba(26, 22, 17, 0.1);
+  --bn-shadow-pop: 0 12px 32px rgba(26, 22, 17, 0.18);
 }
 
 [data-theme="dark"] {
-  --bn-bg-canvas: #0B1120;
-  --bn-bg-surface: #1E293B;
-  --bn-bg-elevated: #334155;
-  --bn-border-subtle: #334155;
-  --bn-text-primary: #F8FAFC;
-  --bn-text-secondary: #CBD5E1;
-  --bn-text-muted: #94A3B8;
-  --bn-primary: #60A5FA;
-  --bn-primary-hover: #3B82F6;
-  --bn-trust-verified: #34D399;
-  --bn-external-link: #818CF8;
-  --bn-warning-amber: #FBBF24;
-  --bn-danger-red: #F87171;
+  color-scheme: dark;
+
+  --bn-bg-canvas: #14110c;
+  --bn-bg-surface: #1d1913;
+  --bn-bg-well: #100e0a;
+  --bn-bg-elevated: #2a251c;
+  --bn-border-subtle: #353023;
+  --bn-border-strong: #4d4636;
+  --bn-ink: #f2efe7;
+
+  --bn-text-primary: #f2efe7;
+  --bn-text-secondary: #cfc9ba;
+  --bn-text-muted: #97907e;
+
+  /* Primary action inverts: paper button, ink text */
+  --bn-action-bg: #f2efe7;
+  --bn-action-bg-hover: #ffffff;
+  --bn-action-text: #1a1611;
+  --bn-primary: #f2efe7;
+  --bn-primary-hover: #ffffff;
+
+  --bn-seal: #d96c5f;
+  --bn-seal-ink: #f2a79d;
+  --bn-seal-wash: #33201c;
+
+  --bn-trust-verified: #4cc38a;
+  --bn-trust-wash: #17342a;
+  --bn-external-link: #f2efe7;
+  --bn-warning-amber: #e0a83e;
+  --bn-warning-wash: #38300f;
+  --bn-danger-red: #e0655a;
+  --bn-danger-wash: #3a1e1a;
+
+  --bn-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --bn-shadow-pop: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--bn-font-sans);
   background-color: var(--bn-bg-canvas);
   color: var(--bn-text-primary);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 code, kbd, samp, pre {
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--bn-font-mono);
 }
 
+::selection {
+  background: var(--bn-seal);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--bn-seal);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -152,34 +152,49 @@ const lineageStatusDescription = computed(() =>
 
 <style scoped>
 .signing-lineage-view {
-  padding: 24px;
-  max-width: 900px;
+  max-width: 920px;
   margin: 0 auto;
 }
 .view-header {
   margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--bn-ink);
+}
+.view-header h2 {
+  font-family: var(--bn-font-display);
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
 }
 .subtitle {
-  color: #64748b;
-  font-size: 14px;
+  color: var(--bn-text-secondary);
+  font-size: 13px;
+  margin: 0;
 }
 .status-summary-card {
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 20px;
-  border-radius: 8px;
+  border-radius: var(--bn-radius-md);
   margin-bottom: 24px;
+  border: 1px solid var(--bn-border-subtle);
+  background: var(--bn-bg-surface);
 }
 .status-valid {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #166534;
+  background: var(--bn-trust-wash);
+  border-color: var(--bn-trust-verified);
+}
+.status-valid .status-info h3 {
+  color: var(--bn-trust-verified);
 }
 .status-warn {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #92400e;
+  background: var(--bn-warning-wash);
+  border-color: var(--bn-warning-amber);
+}
+.status-warn .status-info h3 {
+  color: var(--bn-warning-amber);
 }
 .org-row {
   display: flex;
@@ -187,64 +202,94 @@ const lineageStatusDescription = computed(() =>
   gap: 10px;
   margin-bottom: 16px;
   font-size: 13px;
+  color: var(--bn-text-secondary);
+}
+.org-row label {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
 }
 .org-row select {
   padding: 8px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
   font-size: 13px;
-  background: white;
+  font-family: var(--bn-font-sans);
+  background: var(--bn-bg-surface);
+  color: var(--bn-text-primary);
 }
 .loading-row {
-  padding: 16px;
-  color: #64748b;
+  padding: 24px;
+  color: var(--bn-text-muted);
   font-size: 14px;
+  text-align: center;
 }
 .load-error {
   padding: 12px 16px;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #991b1b;
-  border-radius: 6px;
+  background: var(--bn-danger-wash);
+  border: 1px solid var(--bn-danger-red);
+  color: var(--bn-danger-red);
+  border-radius: var(--bn-radius-sm);
   font-size: 13px;
   margin-bottom: 16px;
 }
 .empty-row {
-  padding: 16px;
-  color: #64748b;
+  padding: 20px 16px;
+  color: var(--bn-text-muted);
   font-size: 14px;
   text-align: center;
 }
 .release-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   margin-top: 12px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-sm);
+  overflow: hidden;
 }
 .release-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border-radius: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--bn-border-subtle);
   font-size: 13px;
+}
+.release-row:last-child {
+  border-bottom: none;
+}
+.font-mono {
+  font-family: var(--bn-font-mono);
+  font-size: 12px;
+  color: var(--bn-text-secondary);
 }
 .status-info h3 {
   margin: 0 0 4px 0;
+  font-family: var(--bn-font-display);
   font-size: 16px;
+  font-weight: 800;
 }
 .status-info p {
   margin: 0;
-  font-size: 14px;
-  color: #15803d;
+  font-size: 13px;
+  color: var(--bn-text-secondary);
 }
 .lineage-tree-section {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  background: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
   padding: 24px;
   margin-bottom: 24px;
+}
+.lineage-tree-section > h3 {
+  font-family: var(--bn-font-display);
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--bn-border-subtle);
 }
 .lineage-nodes {
   display: flex;
@@ -262,55 +307,59 @@ const lineageStatusDescription = computed(() =>
 .lineage-node {
   width: 100%;
   max-width: 700px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-md);
   padding: 20px;
-  background: #f8fafc;
+  background: var(--bn-bg-well);
 }
 .lineage-node.is-current {
-  border-color: #22c55e;
-  background: #ffffff;
-  box-shadow: 0 2px 4px rgba(34, 197, 94, 0.1);
-}
-.lineage-node.is-root {
-  border-color: #3b82f6;
+  border-color: var(--bn-trust-verified);
+  background: var(--bn-bg-surface);
 }
 .node-badge {
-  margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 .badge {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: var(--bn-radius-sm);
+  border: 1px solid var(--bn-border-strong);
+  color: var(--bn-text-secondary);
+  white-space: nowrap;
 }
 .badge-primary {
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: var(--bn-seal);
+  color: var(--bn-seal);
 }
 .badge-success {
-  background: #f0fdf4;
-  color: #15803d;
+  border-color: var(--bn-trust-verified);
+  color: var(--bn-trust-verified);
 }
 .badge-secondary {
-  background: #f1f5f9;
-  color: #475569;
+  border-color: var(--bn-border-strong);
+  color: var(--bn-text-secondary);
 }
 .node-field {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .node-field label {
-  font-size: 11px;
-  text-transform: uppercase;
-  color: #64748b;
-  font-weight: 600;
-  margin-bottom: 2px;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--bn-text-muted);
+  margin-bottom: 6px;
   display: block;
 }
 .hash-box {
-  background: #f1f5f9;
-  padding: 6px 10px;
-  border-radius: 4px;
+  background: var(--bn-bg-surface);
+  border: 1px solid var(--bn-border-subtle);
+  padding: 8px 12px;
+  border-radius: var(--bn-radius-sm);
   word-break: break-all;
   font-size: 12px;
 }
@@ -319,36 +368,39 @@ const lineageStatusDescription = computed(() =>
   flex-wrap: wrap;
   gap: 16px;
   font-size: 12px;
-  color: #64748b;
-  border-top: 1px solid #e2e8f0;
-  padding-top: 10px;
+  color: var(--bn-text-muted);
+  border-top: 1px solid var(--bn-border-subtle);
+  padding-top: 12px;
 }
-.lineage-connector {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 12px 0;
-  color: #64748b;
-  font-size: 12px;
-}
-.arrow-down {
-  font-size: 20px;
+.node-meta code {
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  color: var(--bn-text-secondary);
 }
 .guidance-card {
-  background: #fffbeb;
-  border: 1px solid #fef3c7;
-  border-radius: 8px;
+  background: var(--bn-warning-wash);
+  border: 1px solid var(--bn-warning-amber);
+  border-radius: var(--bn-radius-md);
   padding: 20px;
-  color: #92400e;
 }
 .guidance-card h4 {
+  font-family: var(--bn-font-display);
+  font-size: 14px;
+  font-weight: 800;
   margin: 0 0 10px 0;
+  color: var(--bn-warning-amber);
 }
 .guidance-card ul {
   margin: 0;
   padding-left: 20px;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
+  color: var(--bn-text-secondary);
+}
+.guidance-card code {
+  font-family: var(--bn-font-mono);
+  font-size: 12px;
+  color: var(--bn-text-primary);
 }
 </style>
 

@@ -85,41 +85,46 @@ function formatSize(bytes?: number): string {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: var(--bn-radius-sm);
+  font-family: var(--bn-font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   text-decoration: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
+  border: 1px solid transparent;
 }
 .bn-btn-direct {
-  background-color: var(--bn-trust-verified, #059669);
-  color: #ffffff;
+  background-color: var(--bn-action-bg);
+  color: var(--bn-action-text);
 }
 .bn-btn-direct:hover {
-  filter: brightness(1.1);
+  background-color: var(--bn-action-bg-hover);
 }
 .bn-btn-external {
-  background-color: var(--bn-external-link, #4F46E5);
-  color: #ffffff;
+  background-color: transparent;
+  color: var(--bn-text-primary);
+  border-color: var(--bn-border-strong);
 }
 .bn-btn-external:hover {
-  filter: brightness(1.1);
+  border-color: var(--bn-text-primary);
 }
 .bn-btn-disabled {
-  background-color: var(--bn-border-subtle, #E2E8F0);
-  color: var(--bn-text-muted, #64748B);
+  background-color: var(--bn-bg-well);
+  color: var(--bn-text-muted);
+  border-color: var(--bn-border-subtle);
   cursor: not-allowed;
 }
 .bn-icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 .bn-size-label {
-  font-size: 13px;
-  opacity: 0.85;
+  font-family: var(--bn-font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.75;
 }
 </style>
 

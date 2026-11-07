@@ -4,7 +4,7 @@
     <header class="bn-topbar">
       <div class="bn-brand-area">
         <a href="/" class="bn-logo">
-          <span class="bn-logo-icon">▲</span>
+          <span class="seal-mark" aria-hidden="true">BN</span>
           <span class="bn-logo-text">BookingNetwork</span>
           <span class="bn-badge-admin">ADMIN CONSOLE</span>
         </a>
@@ -16,7 +16,7 @@
           <span>{{ healthText }}</span>
         </div>
         <div class="bn-dual-control-pill">
-          <span>Dual-Control: <strong>ACTIVE</strong></span>
+          <span>DUAL-CONTROL <strong>ACTIVE</strong></span>
         </div>
       </div>
 
@@ -42,76 +42,76 @@
       <!-- Left Navigation Sidebar -->
       <aside class="bn-sidebar">
         <div class="bn-nav-group">
-          <span class="bn-group-title">핵심 관제 (Overview)</span>
+          <span class="bn-group-title">OVERVIEW · 핵심 관제</span>
           <router-link to="/" class="bn-nav-item" exact-active-class="active">
-            <span class="bn-nav-icon">📊</span>
+            <span class="bn-nav-index">01</span>
             <span>종합 대시보드</span>
           </router-link>
           <router-link to="/analytics" class="bn-nav-item" active-class="active">
-            <span class="bn-nav-icon">📈</span>
+            <span class="bn-nav-index">02</span>
             <span>플랫폼 통계</span>
           </router-link>
           <router-link to="/audit" class="bn-nav-item" active-class="active">
-            <span class="bn-nav-icon">📜</span>
+            <span class="bn-nav-index">03</span>
             <span>감사 로그 체인</span>
           </router-link>
         </div>
 
         <div class="bn-nav-group">
-          <span class="bn-group-title">보안 & 비상 통제 (Security)</span>
+          <span class="bn-group-title">SECURITY · 보안 & 비상 통제</span>
           <router-link to="/security/kill-switch" class="bn-nav-item bn-item-alert" active-class="active">
-            <span class="bn-nav-icon">🚨</span>
+            <span class="bn-nav-index">04</span>
             <span>비상 킬스위치 (Takedown)</span>
           </router-link>
           <router-link to="/security/reviews" class="bn-nav-item" active-class="active">
-            <span class="bn-nav-icon">🛡️</span>
+            <span class="bn-nav-index">05</span>
             <span>APK 보안 정밀 분석</span>
           </router-link>
           <router-link to="/moderation" class="bn-nav-item" active-class="active">
-            <span class="bn-nav-icon">⚖️</span>
+            <span class="bn-nav-index">06</span>
             <span>신고 & 악성 리뷰 큐</span>
           </router-link>
         </div>
 
         <div class="bn-nav-group">
-          <span class="bn-group-title">앱 & 카탈로그 심사 (Review)</span>
+          <span class="bn-group-title">REVIEW · 앱 & 카탈로그 심사</span>
           <router-link to="/apps/metadata" class="bn-nav-item" active-class="active">
-            <span class="bn-nav-icon">📝</span>
+            <span class="bn-nav-index">07</span>
             <span>앱 메타데이터 심사</span>
           </router-link>
           <router-link to="/ads" class="bn-nav-item" active-class="active">
-            <span class="bn-nav-icon">📢</span>
+            <span class="bn-nav-index">08</span>
             <span>광고 캠페인 검수</span>
           </router-link>
           <router-link to="/connectors" class="bn-nav-item" active-class="active">
-            <span class="bn-nav-icon">🔌</span>
+            <span class="bn-nav-index">09</span>
             <span>외부 미러 커넥터</span>
           </router-link>
           <router-link to="/verifications" class="bn-nav-item" active-class="active">
-            <span class="bn-nav-icon">✅</span>
+            <span class="bn-nav-index">10</span>
             <span>조직 KYB 심사</span>
           </router-link>
         </div>
 
         <div class="bn-nav-group">
-          <span class="bn-group-title">재무 & 거버넌스 (Finance)</span>
+          <span class="bn-group-title">FINANCE · 재무 & 거버넌스</span>
           <router-link to="/rbac" class="bn-nav-item" active-class="active">
-            <span class="bn-nav-icon">👥</span>
+            <span class="bn-nav-index">11</span>
             <span>RBAC & 이중 승인</span>
           </router-link>
           <router-link to="/finance/orders" class="bn-nav-item" active-class="active">
-            <span class="bn-nav-icon">💳</span>
+            <span class="bn-nav-index">12</span>
             <span>주문 & 환불 관리</span>
           </router-link>
           <router-link to="/finance/settlements" class="bn-nav-item" active-class="active">
-            <span class="bn-nav-icon">🏦</span>
+            <span class="bn-nav-index">13</span>
             <span>개발사 정산 지급</span>
           </router-link>
         </div>
 
         <div class="bn-sidebar-footer">
           <span class="bn-version-label">AppMarket Platform v1.0.0</span>
-          <span class="bn-sla-label">SLA 99.99% Guaranteed</span>
+          <span class="bn-sla-label">SLA 99.99% GUARANTEED</span>
         </div>
       </aside>
 
@@ -196,7 +196,6 @@ onMounted(async () => {
 </script>
 
 <style>
-/* Global Reset and Dark Admin Palette */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -204,9 +203,9 @@ onMounted(async () => {
 }
 
 body {
-  background-color: #0b1120;
-  color: #f1f5f9;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bn-bg-canvas);
+  color: var(--bn-text-primary);
+  font-family: var(--bn-font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -221,13 +220,21 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 64px;
-  background-color: #0f172a;
-  border-bottom: 1px solid #1e293b;
-  padding: 0 24px;
+  gap: 16px;
+  min-height: 60px;
+  background-color: var(--bn-bg-surface);
+  border-bottom: 1px solid var(--bn-border-subtle);
+  padding: 8px 20px;
   position: sticky;
   top: 0;
   z-index: 50;
+}
+
+.bn-brand-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
 }
 
 .bn-brand-area .bn-logo {
@@ -235,101 +242,105 @@ body {
   align-items: center;
   gap: 10px;
   text-decoration: none;
-  color: #f8fafc;
+  color: var(--bn-text-primary);
+  flex-shrink: 0;
 }
 
-.bn-logo-icon {
-  font-size: 20px;
-  color: #38bdf8;
+.seal-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background-color: var(--bn-seal);
+  color: #fff;
+  font-family: var(--bn-font-display);
+  font-weight: 900;
+  font-size: 11px;
+  border-radius: var(--bn-radius-sm);
 }
 
 .bn-logo-text {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
+  font-family: var(--bn-font-display);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .bn-badge-admin {
-  background-color: #dc2626;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 4px;
-  letter-spacing: 0.5px;
+  font-family: var(--bn-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--bn-seal);
+  border: 1px solid var(--bn-seal);
+  padding: 3px 7px;
+  border-radius: var(--bn-radius-sm);
+  white-space: nowrap;
 }
 
 .bn-topbar-metrics {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
 }
 
-.bn-status-pill {
+.bn-status-pill,
+.bn-dual-control-pill {
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: #064e3b;
-  color: #34d399;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 9999px;
-  border: 1px solid #059669;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--bn-border-subtle);
+  border-radius: var(--bn-radius-pill);
+  padding: 5px 12px;
+  color: var(--bn-text-secondary);
+  white-space: nowrap;
 }
 
-.bn-pulse-dot {
-  width: 8px;
-  height: 8px;
-  background-color: #10b981;
-  border-radius: 50%;
-  box-shadow: 0 0 8px #10b981;
+.bn-status-pill.healthy {
+  border-color: var(--bn-trust-verified);
+  color: var(--bn-trust-verified);
 }
 
 .bn-status-pill.degraded {
-  background-color: #451a03;
-  color: #fbbf24;
-  border-color: #b45309;
+  border-color: var(--bn-danger-red);
+  color: var(--bn-danger-red);
 }
 
-.bn-status-pill.degraded .bn-pulse-dot {
-  background-color: #f59e0b;
-  box-shadow: 0 0 8px #f59e0b;
-}
-
-.bn-dual-control-pill {
-  background-color: #1e293b;
-  color: #94a3b8;
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid #334155;
+.bn-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: currentColor;
 }
 
 .bn-dual-control-pill strong {
-  color: #38bdf8;
+  color: var(--bn-seal);
 }
 
 .bn-topbar-actions {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .bn-nav-link-btn {
-  color: #94a3b8;
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--bn-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
   text-decoration: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid #334155;
-  transition: all 0.15s ease;
+  padding: 7px 12px;
+  border-radius: var(--bn-radius-sm);
+  border: 1px solid var(--bn-border-subtle);
+  white-space: nowrap;
 }
 
 .bn-nav-link-btn:hover {
-  background-color: #1e293b;
-  color: #f8fafc;
+  color: var(--bn-text-primary);
+  border-color: var(--bn-border-strong);
 }
 
 .bn-admin-user {
@@ -337,69 +348,102 @@ body {
   align-items: center;
   gap: 10px;
   padding-left: 12px;
-  border-left: 1px solid #334155;
+  border-left: 1px solid var(--bn-border-subtle);
 }
 
 .bn-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #38bdf8, #2563eb);
-  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--bn-radius-sm);
+  background: var(--bn-ink);
+  color: var(--bn-bg-canvas);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
+  font-family: var(--bn-font-display);
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 
 .bn-user-info {
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .bn-user-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #f8fafc;
+  font-family: var(--bn-font-mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 170px;
 }
 
 .bn-user-role {
-  font-size: 11px;
-  color: #64748b;
+  font-family: var(--bn-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--bn-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 170px;
+}
+
+.bn-logout-btn,
+.bn-login-btn {
+  background: none;
+  border: 1px solid var(--bn-border-subtle);
+  color: var(--bn-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--bn-radius-sm);
+  cursor: pointer;
+  margin-left: 4px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.bn-logout-btn:hover,
+.bn-login-btn:hover {
+  color: var(--bn-text-primary);
+  border-color: var(--bn-border-strong);
 }
 
 /* Layout Body */
 .bn-admin-body {
   display: flex;
   flex: 1;
+  align-items: stretch;
 }
 
-/* Left Sidebar */
+/* Sidebar */
 .bn-sidebar {
-  width: 260px;
-  background-color: #0f172a;
-  border-right: 1px solid #1e293b;
+  width: 264px;
+  background-color: var(--bn-bg-surface);
+  border-right: 1px solid var(--bn-border-subtle);
   padding: 20px 12px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 22px;
   flex-shrink: 0;
 }
 
 .bn-nav-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .bn-group-title {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #64748b;
-  letter-spacing: 0.5px;
-  padding: 0 12px 6px;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--bn-text-muted);
+  padding: 0 12px 8px;
 }
 
 .bn-nav-item {
@@ -407,212 +451,95 @@ body {
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  border-radius: 8px;
-  color: #94a3b8;
+  border-radius: var(--bn-radius-sm);
+  color: var(--bn-text-secondary);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   text-decoration: none;
-  transition: all 0.15s ease;
+  border-left: 2px solid transparent;
 }
 
 .bn-nav-item:hover {
-  background-color: #1e293b;
-  color: #f8fafc;
+  background-color: var(--bn-bg-well);
+  color: var(--bn-text-primary);
 }
 
 .bn-nav-item.active {
-  background-color: #1d4ed8;
-  color: #ffffff;
-  font-weight: 600;
+  background-color: var(--bn-bg-well);
+  color: var(--bn-text-primary);
+  border-left-color: var(--bn-seal);
 }
 
-.bn-item-alert:hover {
-  background-color: #7f1d1d;
-  color: #fca5a5;
+.bn-nav-item.bn-item-alert {
+  color: var(--bn-danger-red);
 }
 
-.bn-item-alert.active {
-  background-color: #b91c1c;
+.bn-nav-item.bn-item-alert:hover {
+  color: var(--bn-danger-red);
+}
+
+.bn-nav-index {
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  color: var(--bn-text-muted);
+  width: 20px;
+  flex-shrink: 0;
+}
+.bn-nav-item.active .bn-nav-index {
+  color: var(--bn-seal);
+}
+.bn-item-alert .bn-nav-index {
+  color: var(--bn-danger-red);
 }
 
 .bn-sidebar-footer {
   margin-top: auto;
   padding: 16px 12px 8px;
-  border-top: 1px solid #1e293b;
+  border-top: 1px solid var(--bn-border-subtle);
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
 .bn-version-label {
-  font-size: 11px;
-  color: #64748b;
-  font-family: monospace;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  color: var(--bn-text-muted);
 }
 
 .bn-sla-label {
-  font-size: 11px;
-  color: #10b981;
-  font-weight: 600;
+  font-family: var(--bn-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--bn-seal);
 }
 
 /* Main Content Area */
 .bn-main-content {
   flex: 1;
-  background-color: #0b1120;
+  min-width: 0;
+  background-color: var(--bn-bg-canvas);
+  padding: 28px;
   overflow-y: auto;
-  min-height: calc(100vh - 64px);
 }
 
-/* Auth Gate Modal Styles */
-.bn-logout-btn {
-  background: transparent;
-  border: 1px solid #475569;
-  color: #94a3b8;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  cursor: pointer;
-  margin-left: 8px;
-  transition: all 0.15s;
+@media (max-width: 1100px) {
+  .bn-sidebar {
+    width: 220px;
+  }
+  .bn-user-info,
+  .bn-topbar-metrics {
+    display: none;
+  }
 }
-.bn-logout-btn:hover {
-  background: #334155;
-  color: #f8fafc;
-}
-
-.bn-login-btn {
-  background: #1d4ed8;
-  border: none;
-  color: #ffffff;
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  display: inline-block;
-}
-
-.bn-auth-gate-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(11, 17, 32, 0.85);
-  backdrop-filter: blur(8px);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-
-.bn-auth-card {
-  background: #0f172a;
-  border: 1px solid #334155;
-  border-radius: 16px;
-  max-width: 580px;
-  width: 100%;
-  padding: 32px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
-}
-
-.bn-auth-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.bn-auth-shield {
-  font-size: 40px;
-  display: block;
-  margin-bottom: 12px;
-}
-
-.bn-auth-header h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: #f8fafc;
-  margin-bottom: 8px;
-}
-
-.bn-auth-header p {
-  font-size: 13px;
-  color: #94a3b8;
-  line-height: 1.5;
-}
-
-.bn-role-options {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.bn-role-card {
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 10px;
-  padding: 16px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.bn-role-card:hover {
-  border-color: #60a5fa;
-  background: #24344d;
-}
-
-.bn-role-card.active {
-  border-color: #38bdf8;
-  background: #172554;
-  box-shadow: 0 0 0 1px #38bdf8;
-}
-
-.bn-role-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.bn-role-card-header strong {
-  font-size: 14px;
-  color: #f1f5f9;
-}
-
-.bn-role-badge {
-  font-size: 11px;
-  font-family: monospace;
-  background: #0f172a;
-  color: #38bdf8;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.bn-role-card p {
-  font-size: 12px;
-  color: #94a3b8;
-  line-height: 1.4;
-}
-
-.bn-auth-actions .bn-btn-primary {
-  width: 100%;
-  padding: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  background: #2563eb;
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.bn-auth-actions .bn-btn-primary:hover:not(:disabled) {
-  background: #1d4ed8;
-}
-
-.bn-auth-actions .bn-btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+@media (max-width: 860px) {
+  .bn-admin-body {
+    flex-direction: column;
+  }
+  .bn-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--bn-border-subtle);
+  }
 }
 </style>

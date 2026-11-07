@@ -20,9 +20,9 @@
   letter-spacing: 0.5px !important;
   padding: 2px 7px !important;
   border-radius: 4px !important;
-  background-color: #0F172A !important;
-  color: #F8FAFC !important;
-  border: 1px solid #334155 !important;
+  background-color: var(--bn-ink) !important;
+  color: var(--bn-bg-canvas) !important;
+  border: 1px solid var(--bn-border-strong) !important;
   line-height: 1.4 !important;
 }
 </style>
